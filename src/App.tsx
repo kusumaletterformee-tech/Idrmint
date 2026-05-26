@@ -286,7 +286,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 font-sans text-zinc-150 flex flex-col selection:bg-indigo-500/30 selection:text-white">
       {/* Dynamic Header */}
-      <header className="border-b border-zinc-900 bg-zinc-950 sticky top-0 z-50 px-4 sm:px-6 pt-9 pb-4 sm:py-4">
+      <header className="border-b border-zinc-900 bg-zinc-950 sticky top-0 z-50 px-4 sm:px-6 pt-20 pb-5 sm:py-5">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-600 to-indigo-600 shadow-md">
