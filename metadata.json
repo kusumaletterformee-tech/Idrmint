@@ -1,0 +1,6 @@
+{
+  "name": "Rupiah Coin Miner",
+  "description": "Aplikasi penambangan koin Rupiah virtual dengan enkripsi end-to-end, dompet penampungan, penarikan otomatis ke e-wallet lokal, dan sistem referral.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
