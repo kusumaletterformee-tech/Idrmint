@@ -59,6 +59,7 @@ export interface MiningConfig {
   depositHistory: DepositTransaction[];
   privateKey: string; // Client-side simulated mining encryption private key
   publicKey: string;
+  miningSessionExpiry?: number; // 24-hour cycle session expiry timestamp in ms
 }
 
 export interface UserAccount {

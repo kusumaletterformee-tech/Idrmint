@@ -14,6 +14,8 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
   const [recentBlocks, setRecentBlocks] = useState<MiningLog[]>([]);
   const [cpuLoad, setCpuLoad] = useState<number>(34);
   const [temperature, setTemperature] = useState<number>(41);
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [percentLeft, setPercentLeft] = useState<number>(100);
   const blockTimerRef = useRef<NodeJS.Timeout | null>(null);
   const statsTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -86,11 +88,61 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
     };
   }, [config.isMiningActive, config.baseHashRate, config.boostMultiplier, recentBlocks]);
 
+  // Handle 24-hour countdown loop
+  useEffect(() => {
+    const updateCountdown = () => {
+      if (!config.isMiningActive || !config.miningSessionExpiry) {
+        setTimeLeft('');
+        setPercentLeft(0);
+        return;
+      }
+
+      const expiry = config.miningSessionExpiry;
+      const now = Date.now();
+      const diff = expiry - now;
+
+      if (diff <= 0) {
+        // Session expired! Auto-terminate!
+        setTimeLeft('Sesi Habis (Daluwarsa)');
+        setPercentLeft(0);
+        setConfig(prev => ({
+          ...prev,
+          isMiningActive: false,
+          miningSessionExpiry: undefined
+        }));
+        onAddLog('[MINER] Sesi pertambangan otomatis 24 jam telah berakhir. Kembali esok hari dan silakan klik tombol "Mulai Mining 24 Jam" untuk mengaktifkan sesi penambangan baru.');
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        setTimeLeft(`${pad(hours)} jam ${pad(minutes)} menit ${pad(seconds)} detik`);
+
+        const totalDuration = 24 * 60 * 60 * 1000;
+        const progress = Math.min(100, Math.max(0, (diff / totalDuration) * 100));
+        setPercentLeft(progress);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [config.isMiningActive, config.miningSessionExpiry, setConfig, onAddLog]);
+
   const toggleMining = () => {
     setConfig(prev => {
       const nextActive = !prev.isMiningActive;
-      onAddLog(nextActive ? '[MINER] Menghubungkan ke Pool IDR-Secure... Penambangan 24 jam diaktifkan.' : '[MINER] Penambangan dinonaktifkan sementara.');
-      return { ...prev, isMiningActive: nextActive };
+      const expiry = nextActive ? Date.now() + 24 * 60 * 60 * 1000 : undefined;
+      onAddLog(nextActive 
+        ? '[MINER] Menghubungkan ke Pool IDR-Secure... Sesi aman 24 jam diaktifkan. Silakan kembali esok hari setelah waktu sesi habis untuk melanjutkan penambangan.' 
+        : '[MINER] Penambangan dinonaktifkan sementara oleh pengguna.'
+      );
+      return { 
+        ...prev, 
+        isMiningActive: nextActive, 
+        miningSessionExpiry: expiry 
+      };
     });
   };
 
@@ -142,6 +194,44 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
             </button>
           </div>
         </div>
+
+        {/* Modern 24-Hour Countdown Timer and Instructions */}
+        {config.isMiningActive && config.miningSessionExpiry && (
+          <div className="mt-6 p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 space-y-3 relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 font-mono flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                Sesi Berjalan Otomatis (24 Jam)
+              </span>
+              <span className="text-xs font-mono font-medium text-white bg-zinc-950 px-2.5 py-1 rounded-md border border-zinc-850">
+                Sisa Sesi: <span className="text-emerald-400 font-bold">{timeLeft || 'Menghitung...'}</span>
+              </span>
+            </div>
+            
+            {/* Dynamic Progress Bar */}
+            <div className="w-full bg-zinc-950 rounded-full h-2 overflow-hidden border border-zinc-800">
+              <motion.div 
+                className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full"
+                initial={{ width: '100%' }}
+                animate={{ width: `${percentLeft}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            </div>
+
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              💡 <strong>Petunjuk Pertambangan:</strong> Penambangan ini berjalan otomatis penuh di server Cloud Node kami dengan cukup <strong>1x klik</strong>. Hari esok ketika waktu sesi di atas habis (00:00:00), Anda cukup kembali ke aplikasi ini untuk memicu sesi penambangan 24 jam baru agar akumulasi koin di penampungan berjalan lancar.
+            </p>
+          </div>
+        )}
+
+        {!config.isMiningActive && (
+          <div className="mt-6 p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 text-xs text-amber-200 leading-relaxed relative z-10 flex items-start gap-2">
+            <span className="text-amber-400 shrink-0">📌</span>
+            <p>
+              <strong>Sesi Pertambangan Siap Diaktifkan:</strong> Cukup klik tombol <strong>"Mulai Mining 24 Jam"</strong> di atas. Algoritma penambang otomatis akan berjalan selama 24 jam penuh. Anda bebas menutup peramban/browser, dan silakan kembali hari esok untuk memulai sesi penambangan harian berikutnya!
+            </p>
+          </div>
+        )}
 
         {/* Live Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-6 border-t border-zinc-800">
