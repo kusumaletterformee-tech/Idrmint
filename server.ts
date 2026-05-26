@@ -282,6 +282,47 @@ async function startServer() {
     });
   });
 
+  // API 6: Direct /webhook endpoint layout requested by the user
+  app.post("/webhook", (req, res) => {
+    const data = req.body;
+    if (!data || !data.order_id || !data.status || data.amount === undefined) {
+      return res.status(400).send("Bad Request: Missing parameters");
+    }
+
+    if (data.status === "PAID") {
+      const list = readDb();
+      let found = false;
+      let targetUserIndex = -1;
+      let targetTxIndex = -1;
+
+      for (let uIdx = 0; uIdx < list.length; uIdx++) {
+        const user = list[uIdx];
+        if (user.miningConfig && Array.isArray(user.miningConfig.depositHistory)) {
+          const txIdx = user.miningConfig.depositHistory.findIndex(tx => tx.id === data.order_id);
+          if (txIdx > -1) {
+            targetUserIndex = uIdx;
+            targetTxIndex = txIdx;
+            found = true;
+            break;
+          }
+        }
+      }
+
+      if (found) {
+        const user = list[targetUserIndex];
+        const tx = user.miningConfig.depositHistory[targetTxIndex];
+        
+        if (tx.status === "Pending") {
+          tx.status = "Completed";
+          user.miningConfig.balanceEWallet += Number(data.amount);
+          writeDb(list);
+        }
+      }
+    }
+
+    res.send("OK");
+  });
+
   // Vite Middleware configuration
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

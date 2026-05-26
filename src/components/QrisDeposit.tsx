@@ -377,29 +377,10 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
                   <div className="flex items-start gap-2 text-xs text-zinc-400">
                     <ShieldAlert className="h-4.5 w-4.5 text-indigo-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="font-semibold text-zinc-200">Notifikasi Webhook Gateway Otomatis</p>
+                      <p className="font-semibold text-zinc-200">Deteksi Otomatis & Konfirmasi Gateway</p>
                       <p className="text-[11px] text-zinc-400 leading-normal">
-                        Kirim notifikasi HTTP POST yang valid ke server API Anda <code>/api/webhook</code> untuk memicu persetujuan otomatis instan dari pihak bank/payment gateway.
+                        Sistem gateway kami mendeteksi transfer Anda secara real-time di latar belakang melalui callback webhook aman. Jika Anda sudah berhasil memindai dan mentransfer dana, silakan tekan tombol <strong>"Konfirmasi Pembayaran"</strong> untuk memvalidasi status mutasi Anda secara instan.
                       </p>
-                    </div>
-                  </div>
-
-                  {/* Rest API JSON Payload block preview */}
-                  <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850 space-y-2">
-                    <div className="flex justify-between items-center text-[9px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
-                      <span>HTTP POST Payload (Webhook)</span>
-                      <span className="text-zinc-650">application/json</span>
-                    </div>
-                    <pre className="text-[10px] font-mono text-emerald-400 p-2 bg-zinc-900/40 rounded border border-zinc-850 select-all overflow-x-auto whitespace-pre leading-relaxed">
-{JSON.stringify({
-  order_id: activeInvoice.id,
-  status: "PAID",
-  amount: activeInvoice.amount
-}, null, 2)}
-                    </pre>
-                    <div className="flex items-center justify-between text-[9px] text-zinc-500 font-mono">
-                      <span>Target Endpoint: <strong className="text-zinc-300">/api/webhook</strong></span>
-                      <span>Status: Keamanan Terenkripsi</span>
                     </div>
                   </div>
 
@@ -429,7 +410,7 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
                       ) : (
                         <>
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          Bayar QRIS & Kirim Webhook
+                          Konfirmasi Pembayaran
                         </>
                       )}
                     </button>
