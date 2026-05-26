@@ -88,16 +88,16 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
 
       setActiveInvoice(updatedInvoice);
 
-      // Add to Dompet Imigrasi (Penampungan) and depositHistory
+      // Add to Sisa Saldo Ter-settle (DANA) and depositHistory
       setConfig((prev) => ({
         ...prev,
-        balancePenampungan: prev.balancePenampungan + activeInvoice.amount,
+        balanceEWallet: prev.balanceEWallet + activeInvoice.amount,
         depositHistory: [updatedInvoice, ...prev.depositHistory],
       }));
 
       setIsPayingSimulated(false);
-      setDepositSuccessMessage(`Selesai! Dana ${formatRupiah(activeInvoice.amount)} berhasil masuk ke Dompet Imigrasi`);
-      onAddLog(`[DEPOSIT] Pembayaran QRIS #${activeInvoice.id} BERHASIL diverifikasi! ${formatRupiah(activeInvoice.amount)} langsung dikonfirmasi ke Dompet Imigrasi.`);
+      setDepositSuccessMessage(`Selesai! Dana ${formatRupiah(activeInvoice.amount)} berhasil masuk ke Sisa Saldo Ter-settle (DANA)`);
+      onAddLog(`[DEPOSIT] Pembayaran QRIS #${activeInvoice.id} BERHASIL diverifikasi! ${formatRupiah(activeInvoice.amount)} langsung dikonfirmasi ke Sisa Saldo Ter-settle (DANA).`);
       
       // Clear success banner after some time
       setTimeout(() => setDepositSuccessMessage(''), 6000);
@@ -122,15 +122,15 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
               Sistem Deposit Instant QRIS Nasional
             </span>
             <h2 className="text-xl font-bold font-sans tracking-tight text-white">
-              Isi Ulang Saldo Dompet Imigrasi (Penampungan)
+              Isi Ulang Sisa Saldo Ter-settle (DANA)
             </h2>
             <p className="text-xs text-zinc-400 max-w-xl mt-1 leading-relaxed">
-              Butuh memperkuat saldo di Dompet Imigrasi penampungan Anda? Lakukan deposit instan menggunakan kode QRIS standar Bank Indonesia. Dapat dipindai menggunakan dompet lokal seperti GoPay, DANA, OVO, ShopeePay atau M-Banking.
+              Butuh memperkuat Sisa Saldo Ter-settle (DANA) Anda untuk membeli atau menyewa hashrate pertambangan? Lakukan deposit instan menggunakan kode QRIS standar Bank Indonesia. Dapat dipindai menggunakan dompet lokal seperti DANA, GoPay, OVO, ShopeePay atau M-Banking Anda.
             </p>
           </div>
           <div className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-850 flex flex-col font-mono text-right">
-            <span className="text-[10px] text-zinc-500 uppercase">Dompet Imigrasi Saat Ini</span>
-            <span className="text-lg font-bold text-emerald-400">{formatRupiah(config.balancePenampungan)}</span>
+            <span className="text-[10px] text-zinc-500 uppercase">Sisa Saldo Ter-settle (DANA) Saat Ini</span>
+            <span className="text-lg font-bold text-pink-400">{formatRupiah(config.balanceEWallet)}</span>
           </div>
         </div>
       </div>
@@ -398,7 +398,7 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
             <ArrowDownRight className="h-8 w-8 text-zinc-650 mx-auto mb-2" />
             <p className="text-xs text-zinc-400">Belum ada riwayat isi ulang saldo.</p>
             <p className="text-[10px] text-zinc-500 mt-1">
-              Gunakan QRIS diatas untuk menyuntikkan dana langsung ke Dompet Imigrasi Anda jika Anda ingin mempercepat proses verifikasi mining.
+              Gunakan QRIS diatas untuk menyuntikkan dana langsung ke Sisa Saldo Ter-settle (DANA) Anda jika Anda ingin mempercepat atau menyewa hashrate mesin pertambangan.
             </p>
           </div>
         ) : (

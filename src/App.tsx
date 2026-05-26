@@ -391,7 +391,7 @@ export default function App() {
               }`}
             >
               <QrCode className="h-4 w-4" />
-              Deposit QRIS Instan
+              Isi Ulang Saldo (DANA)
             </button>
 
             <button

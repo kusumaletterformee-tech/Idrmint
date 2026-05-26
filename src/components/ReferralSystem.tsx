@@ -165,41 +165,6 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
               </p>
             )}
           </div>
-
-          {/* Simulator Panel */}
-          <div className="p-4 bg-zinc-900/40 border border-zinc-800/60 rounded-xl space-y-4">
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 font-mono mb-1">
-                Mining Sandbox Referral Simulator
-              </h4>
-              <p className="text-xs text-zinc-400">
-                Simulasikan teman baru bergabung menggunakan kode Anda untuk menguji percepatan algoritma pertambangan secara nyata.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[10px] uppercase font-mono text-zinc-500">
-                Masukkan Nama Teman (Opsional)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Ketik nama acak atau biarkan kosong"
-                  value={invitedNameInput}
-                  onChange={(e) => setInvitedNameInput(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-750 focus:outline-none focus:border-indigo-500 transition-colors w-full"
-                />
-                <button
-                  id="btn-simulate-referral"
-                  onClick={() => simulateNewReferralGroup(invitedNameInput.trim() || undefined)}
-                  className="bg-zinc-800 hover:bg-zinc-700 hover:text-white border border-zinc-700 px-4 py-2 rounded-lg font-medium text-xs text-zinc-300 transition-all flex items-center gap-1.5 shrink-0"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  Undang Teman
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Referred Friends Ledger and power counts */}
@@ -220,7 +185,7 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
               {config.referrals.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-xs text-zinc-500">Belum ada teman yang bergabung.</p>
-                  <p className="text-[10px] text-zinc-650 mt-1">Gunakan tombol "Undang Teman" di panel simulasi untuk menguji sistem pertumbuhan koin Anda.</p>
+                  <p className="text-[10px] text-zinc-650 mt-1">Bagikan kode referral unik Anda di atas ke teman Anda untuk menguji sistem pertumbuhan koin Anda.</p>
                 </div>
               ) : (
                 config.referrals.map((friend) => (
