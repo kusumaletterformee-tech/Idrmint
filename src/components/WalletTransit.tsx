@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Settings, ArrowDownRight, RefreshCw, Send, CheckCircle2, CircleDollarSign, ShieldAlert, ListFilter } from 'lucide-react';
+import { Wallet, Settings, ArrowDownRight, RefreshCw, Send, CheckCircle2, CircleDollarSign, ShieldAlert, ListFilter, Lock } from 'lucide-react';
 import { MiningConfig, EWalletType, PayoutTransaction } from '../types';
 import { formatRupiah, generateCryptoHash } from '../utils';
 
@@ -130,10 +130,43 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-zinc-900 space-y-3">
+            {/* Clean Progress & Guidance Block */}
+            <div className="mt-4 p-3.5 bg-zinc-900/60 border border-zinc-800 rounded-xl space-y-2 flex flex-col">
+              <div className="flex items-center justify-between text-xs font-semibold font-sans text-zinc-300">
+                <span className="flex items-center gap-1.5 text-zinc-300">
+                  <Lock className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                  Petunjuk Aktivasi Imigrasi
+                </span>
+                <span className="text-indigo-400 font-mono text-[11px] font-bold">
+                  {Math.min(100, Math.round((config.balancePenampungan / 450000) * 100))}%
+                </span>
+              </div>
+              <p className="text-[10.5px] text-zinc-400 leading-relaxed font-sans">
+                Setiap hasil penambangan koin Rupiah virtual otomatis ditampung di sini. Sistem imigrasi koin ke E-Wallet tujuan akan terbuka otomatis di latar belakang setelah saldo akun Anda mencapai target minimal <strong>{formatRupiah(450000)} (450K koin)</strong>.
+              </p>
+
+              {/* Progress Bar & Status */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                  <span>Progres Akumulasi:</span>
+                  <span className="text-zinc-300 font-bold">{formatRupiah(config.balancePenampungan)} / {formatRupiah(450000)}</span>
+                </div>
+                <div className="w-full bg-zinc-950 rounded-full h-1.5 overflow-hidden border border-zinc-900">
+                  <div 
+                    className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-1.5 rounded-full transition-all duration-500 ease-out" 
+                    style={{ width: `${Math.min(100, Math.round((config.balancePenampungan / 450000) * 100))}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-zinc-900 space-y-3">
               <div className="flex items-center justify-between text-xs text-zinc-400">
                 <span>Verifikasi Transaksi:</span>
-                <span className="text-emerald-400 font-medium">100% Aman</span>
+                <span className="text-emerald-400 font-medium flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  E2E Enkripsi Aktif
+                </span>
               </div>
               <p className="text-[11px] text-zinc-500 leading-relaxed">
                 Koin yang dihasilkan dari penambangan otomatis akan dimasukkan ke dompet penampungan terlebih dahulu untuk diacak energinya melalui enkripsi end-to-end sebelum dikirim.
