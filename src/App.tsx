@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Cpu, Wallet, Users, KeyRound, Terminal, RotateCcw, Landmark, Clock, QrCode, LogOut, Shield, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Cpu, Wallet, Users, KeyRound, Terminal, RotateCcw, Landmark, Clock, QrCode, LogOut, Shield, Zap, FileText, CheckSquare } from 'lucide-react';
 import { MiningConfig, UserAccount } from './types';
 import { generateKeyPair, generateRandomCode, formatRupiah } from './utils';
 import MiningDashboard from './components/MiningDashboard';
@@ -10,9 +10,11 @@ import ReferralSystem from './components/ReferralSystem';
 import SecureLedger from './components/SecureLedger';
 import UserAuth from './components/UserAuth';
 import AdminPanel from './components/AdminPanel';
+import WhitepaperAsset from './components/WhitepaperAsset';
+import MiningTasks from './components/MiningTasks';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'mining' | 'wallet' | 'deposit' | 'referral' | 'security' | 'admin' | 'shop'>('mining');
+  const [activeTab, setActiveTab] = useState<'mining' | 'wallet' | 'deposit' | 'referral' | 'security' | 'admin' | 'shop' | 'whitepaper' | 'tasks'>('mining');
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -44,7 +46,9 @@ export default function App() {
         payoutHistory: [],
         depositHistory: [],
         privateKey: '',
-        publicKey: ''
+        publicKey: '',
+        machineActiveDays: 3,
+        rentedRigs: []
       }
     },
     // Standard Demo Account (Joko)
@@ -96,26 +100,35 @@ export default function App() {
           }
         ],
         privateKey: '',
-        publicKey: ''
+        publicKey: '',
+        machineActiveDays: 3,
+        rentedRigs: []
       }
     }
   ]);
+
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Central Syncing wrapper that pushes mutations securely to database server REST API
   const setUsers = (value: React.SetStateAction<UserAccount[]>) => {
     _setUsers(prev => {
       const nextUsers = typeof value === 'function' ? (value as any)(prev) : value;
 
-      // Persist to Express host backend DB
-      fetch('/api/users/save-all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(nextUsers)
-      }).catch(err => {
-        console.error("Failed to sync database updates with server:", err);
-      });
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(() => {
+        fetch('/api/users/save-all', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(nextUsers)
+        }).catch(err => {
+          console.error("Failed to sync database updates with server:", err);
+        });
+      }, 1500); // 1.5 seconds debounce
 
       return nextUsers;
     });
@@ -178,7 +191,36 @@ export default function App() {
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted && Array.isArray(data) && data.length > 0) {
-          _setUsers(data);
+          _setUsers(prevLocalUsers => {
+            return data.map((serverUser: UserAccount) => {
+              const localUser = prevLocalUsers.find(u => u.id === serverUser.id);
+              if (!localUser) return serverUser;
+
+              // Prevent stale data from rolling back currently active mining state or coin statistics
+              const localActive = localUser.miningConfig.isMiningActive;
+              const serverActive = serverUser.miningConfig.isMiningActive;
+
+              const mergedConfig = {
+                ...serverUser.miningConfig,
+                isMiningActive: localActive || serverActive,
+                miningSessionExpiry: localActive ? localUser.miningConfig.miningSessionExpiry : serverUser.miningConfig.miningSessionExpiry,
+                balancePenampungan: Math.max(localUser.miningConfig.balancePenampungan, serverUser.miningConfig.balancePenampungan),
+                balanceEWallet: Math.max(localUser.miningConfig.balanceEWallet, serverUser.miningConfig.balanceEWallet),
+                totalMined: Math.max(localUser.miningConfig.totalMined, serverUser.miningConfig.totalMined),
+                depositHistory: serverUser.miningConfig.depositHistory.length >= localUser.miningConfig.depositHistory.length
+                  ? serverUser.miningConfig.depositHistory
+                  : localUser.miningConfig.depositHistory,
+                payoutHistory: serverUser.miningConfig.payoutHistory.length >= localUser.miningConfig.payoutHistory.length
+                  ? serverUser.miningConfig.payoutHistory
+                  : localUser.miningConfig.payoutHistory,
+              };
+
+              return {
+                ...serverUser,
+                miningConfig: mergedConfig
+              };
+            });
+          });
         }
       } catch (err) {
         console.warn("Unable to pull database update:", err);
@@ -470,6 +512,19 @@ export default function App() {
             </button>
 
             <button
+              id="tab-tasks"
+              onClick={() => setActiveTab('tasks')}
+              className={`flex items-center gap-2 py-3 px-5 border-b-2 font-medium tracking-wide transition-all duration-200 shrink-0 ${
+                activeTab === 'tasks'
+                  ? 'border-teal-500 text-teal-400 font-semibold bg-teal-950/5'
+                  : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              <CheckSquare className="h-4 w-4" />
+              Tugas & Misi Komunitas
+            </button>
+
+            <button
               id="tab-security"
               onClick={() => setActiveTab('security')}
               className={`flex items-center gap-2 py-3 px-5 border-b-2 font-medium tracking-wide transition-all duration-200 shrink-0 ${
@@ -480,6 +535,19 @@ export default function App() {
             >
               <KeyRound className="h-4 w-4" />
               Sistem Keamanan E2EE
+            </button>
+
+            <button
+              id="tab-whitepaper"
+              onClick={() => setActiveTab('whitepaper')}
+              className={`flex items-center gap-2 py-3 px-5 border-b-2 font-medium tracking-wide transition-all duration-200 shrink-0 ${
+                activeTab === 'whitepaper'
+                  ? 'border-emerald-500 text-emerald-400 font-semibold bg-emerald-950/5'
+                  : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Whitepaper Digital Asset
             </button>
           </div>
 
@@ -504,13 +572,19 @@ export default function App() {
               <WalletTransit config={config} setConfig={setConfig} onAddLog={addLog} />
             )}
             {activeTab === 'deposit' && (
-              <QrisDeposit config={config} setConfig={setConfig} onAddLog={addLog} />
+              <QrisDeposit config={config} setConfig={setConfig} onAddLog={addLog} userId={currentUser?.id} />
             )}
             {activeTab === 'referral' && (
               <ReferralSystem config={config} setConfig={setConfig} onAddLog={addLog} />
             )}
             {activeTab === 'security' && (
               <SecureLedger config={config} setConfig={setConfig} onAddLog={addLog} />
+            )}
+            {activeTab === 'whitepaper' && (
+              <WhitepaperAsset />
+            )}
+            {activeTab === 'tasks' && (
+              <MiningTasks config={config} setConfig={setConfig} onAddLog={addLog} />
             )}
           </div>
 

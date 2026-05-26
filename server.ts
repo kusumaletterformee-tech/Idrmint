@@ -34,7 +34,9 @@ const DEFAULT_USERS: UserAccount[] = [
       payoutHistory: [],
       depositHistory: [],
       privateKey: "",
-      publicKey: ""
+      publicKey: "",
+      machineActiveDays: 3,
+      rentedRigs: []
     }
   },
   {
@@ -85,7 +87,9 @@ const DEFAULT_USERS: UserAccount[] = [
         }
       ],
       privateKey: "",
-      publicKey: ""
+      publicKey: "",
+      machineActiveDays: 3,
+      rentedRigs: []
     }
   }
 ];
@@ -95,7 +99,29 @@ function readDb(): UserAccount[] {
   try {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, "utf-8");
-      return JSON.parse(content);
+      const list: UserAccount[] = JSON.parse(content);
+      
+      // Auto upgrade schema to ensure everyone has machine fields recorded
+      let modified = false;
+      const upgraded = list.map(u => {
+        if (u.miningConfig.machineActiveDays === undefined || u.miningConfig.rentedRigs === undefined) {
+          modified = true;
+          return {
+            ...u,
+            miningConfig: {
+              ...u.miningConfig,
+              machineActiveDays: u.miningConfig.machineActiveDays ?? 3,
+              rentedRigs: u.miningConfig.rentedRigs ?? []
+            }
+          };
+        }
+        return u;
+      });
+
+      if (modified) {
+        writeDb(upgraded);
+      }
+      return upgraded;
     }
   } catch (err) {
     console.error("Failed to read DB, resetting to defaults", err);
@@ -159,6 +185,101 @@ async function startServer() {
       return res.json({ success: true, count: list.length });
     }
     res.status(400).json({ error: "Payload must be a UserAccount array" });
+  });
+
+  // API 4: Create pending deposit invoice
+  app.post("/api/deposit/create", (req, res) => {
+    const { userId, amount } = req.body;
+    if (!userId || !amount || isNaN(Number(amount))) {
+      return res.status(400).json({ error: "UserId and valid amount are required" });
+    }
+
+    const list = readDb();
+    const userIndex = list.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const qrisId = 'QRS-' + Math.floor(Math.random() * 89999 + 10000);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let refNum = 'REF-';
+    for (let i = 0; i < 12; i++) {
+      refNum += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    const newInvoice = {
+      id: qrisId,
+      userId: userId,
+      username: list[userIndex].username,
+      timestamp: new Date().toLocaleTimeString('id-ID'),
+      amount: Number(amount),
+      paymentMethod: 'QRIS' as const,
+      status: 'Pending' as const,
+      referenceNumber: refNum
+    };
+
+    // Append to user's depositHistory
+    list[userIndex].miningConfig.depositHistory = [
+      newInvoice,
+      ...list[userIndex].miningConfig.depositHistory
+    ];
+
+    writeDb(list);
+    res.json({ success: true, invoice: newInvoice });
+  });
+
+  // API 5: Webhook receiver representing simulated payment gateway callback
+  app.post("/api/webhook", (req, res) => {
+    const { order_id, status, amount } = req.body;
+    if (!order_id || !status || amount === undefined) {
+      return res.status(400).json({ error: "Missing webhook parameters (order_id, status, amount)" });
+    }
+
+    if (status !== "PAID") {
+      return res.status(200).json({ message: "Ignored status", success: false });
+    }
+
+    const list = readDb();
+    let found = false;
+    let targetUserIndex = -1;
+    let targetTxIndex = -1;
+
+    for (let uIdx = 0; uIdx < list.length; uIdx++) {
+      const user = list[uIdx];
+      if (user.miningConfig && Array.isArray(user.miningConfig.depositHistory)) {
+        const txIdx = user.miningConfig.depositHistory.findIndex(tx => tx.id === order_id);
+        if (txIdx > -1) {
+          targetUserIndex = uIdx;
+          targetTxIndex = txIdx;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: "No matching pending transaction found for order_id: " + order_id });
+    }
+
+    const user = list[targetUserIndex];
+    const tx = user.miningConfig.depositHistory[targetTxIndex];
+
+    if (tx.status === "Completed") {
+      return res.status(200).json({ message: "Transaction already paid", success: true });
+    }
+
+    // Update transaction status to Completed
+    tx.status = "Completed";
+    
+    // Add amount to user's balance
+    user.miningConfig.balanceEWallet += Number(amount);
+
+    writeDb(list);
+    res.json({
+      success: true,
+      message: `Transaction ${order_id} successfully processed! ${amount} added to user ${user.username}`,
+      updatedBalance: user.miningConfig.balanceEWallet
+    });
   });
 
   // Vite Middleware configuration

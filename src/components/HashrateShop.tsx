@@ -23,37 +23,38 @@ export default function HashrateShop({ config, setConfig, onAddLog }: HashrateSh
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   
-  // Simulated State of Machine Active Lifetime / Stats
-  const [machineActiveDays, setMachineActiveDays] = useState<number>(3);
+  // Simulated List of Rig Hardware to Lease
   const [rigsList, setRigsList] = useState<MiningRigItem[]>([
     {
       id: 'rig-bronze',
       name: 'Antminer S9 - IDR Lite edition',
-      hashPower: 2.5,
+      hashPower: 15.0,
       price: 15000,
-      efficiency: '85%',
-      description: 'Mesin entry-level hemat daya. Bagus untuk meningkatkan koin awal secara konstan.',
+      efficiency: '88%',
+      description: 'Mesin entry-level hemat daya dengan booster akselerasi Cloud. Pemecahan block hash stabil konstan.',
       durabilityDays: 30
     },
     {
       id: 'rig-silver',
       name: 'WhatsMiner M30S - IDR Medium',
-      hashPower: 7.5,
+      hashPower: 45.0,
       price: 45000,
-      efficiency: '92%',
-      description: 'Hashrate stabil tinggi yang dioptimalkan untuk pool Indonesia Central.',
+      efficiency: '94%',
+      description: 'Hashrate super stabil tinggi dioptimalkan secara dinamis untuk kolam penambangan regional Asia-Tenggara.',
       durabilityDays: 60
     },
     {
       id: 'rig-gold',
       name: 'AvalonMade 1246 - IDR Extreme Pro',
-      hashPower: 20.0,
+      hashPower: 150.0,
       price: 100000,
-      efficiency: '98%',
-      description: 'Sewa koin rig level industri dengan sertifikat asimetris E2EE total.',
+      efficiency: '99%',
+      description: 'Sewa rig tingkat industri gaban bertenaga tinggi dengan sistem asimetris terenkripsi 256-bit penuh.',
       durabilityDays: 90
     }
   ]);
+
+  const machineActiveDays = config.machineActiveDays ?? 3;
 
   const buyHashrateBoost = (rig: MiningRigItem) => {
     if (config.balanceEWallet < rig.price) {
@@ -67,15 +68,20 @@ export default function HashrateShop({ config, setConfig, onAddLog }: HashrateSh
     const updatedEWallet = config.balanceEWallet - rig.price;
     const addedHashRate = rig.hashPower;
     
-    setConfig(prev => ({
-      ...prev,
-      balanceEWallet: updatedEWallet,
-      baseHashRate: prev.baseHashRate + addedHashRate,
-    }));
+    setConfig(prev => {
+      const prevActiveDays = prev.machineActiveDays ?? 3;
+      const prevRented = prev.rentedRigs ?? [];
+      return {
+        ...prev,
+        balanceEWallet: updatedEWallet,
+        baseHashRate: prev.baseHashRate + addedHashRate,
+        machineActiveDays: prevActiveDays + rig.durabilityDays,
+        rentedRigs: [...prevRented, rig.id]
+      };
+    });
 
     onAddLog(`[SHOP] Sukses membelanjakan saldo settled ${formatRupiah(rig.price)} untuk sewa ${rig.name}! Kecepatan bertambah +${addedHashRate} KH/s.`);
     setSuccessMessage(`Berhasil menyewa ${rig.name}! Kecepatan mining melesat naik +${addedHashRate} KH/s.`);
-    setMachineActiveDays(prev => prev + rig.durabilityDays);
     setTimeout(() => setSuccessMessage(''), 4000);
   };
 
@@ -228,6 +234,23 @@ export default function HashrateShop({ config, setConfig, onAddLog }: HashrateSh
                 <span className="text-emerald-400 font-bold">0.05 kW/h (Eco)</span>
               </div>
             </div>
+
+            {config.rentedRigs && config.rentedRigs.length > 0 && (
+              <div className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-850 space-y-1.5">
+                <span className="text-[10px] text-zinc-500 font-mono uppercase font-bold block">📦 RIG AKTIF DI SERVER (DATABASE)</span>
+                <div className="space-y-1">
+                  {config.rentedRigs.map((rigId, idx) => {
+                    const matchedRig = rigsList.find(r => r.id === rigId);
+                    return (
+                      <div key={idx} className="flex justify-between text-[10px] font-mono p-1 bg-zinc-950/40 rounded border border-zinc-850/40">
+                        <span className="text-zinc-300 truncate max-w-[140px]">{matchedRig?.name || 'Sewa Tambahan'}</span>
+                        <span className="text-pink-400 font-bold">+{matchedRig?.hashPower.toFixed(1) || '2.5'} KH/s</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-3 bg-indigo-950/20 text-indigo-400 border border-indigo-900/30 rounded-xl text-[10px] leading-relaxed flex gap-1.5">

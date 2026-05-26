@@ -103,7 +103,9 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
         payoutHistory: [],
         depositHistory: [],
         privateKey: keys.privateKey,
-        publicKey: keys.publicKey
+        publicKey: keys.publicKey,
+        machineActiveDays: 3,
+        rentedRigs: []
       };
 
       const newUser: UserAccount = {

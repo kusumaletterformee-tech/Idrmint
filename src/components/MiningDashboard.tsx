@@ -18,6 +18,7 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
   const [percentLeft, setPercentLeft] = useState<number>(100);
   const blockTimerRef = useRef<NodeJS.Timeout | null>(null);
   const statsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const blockHeightRef = useRef<number>(842100);
 
   // Initialize some blocks for context
   useEffect(() => {
@@ -53,9 +54,12 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
         const rewardBase = 12; // Rp base coin
         const actualReward = Math.round(rewardBase * (1 + (config.baseHashRate / 20)) * calculatedMultiplier);
 
+        const nextHeight = blockHeightRef.current + 1;
+        blockHeightRef.current = nextHeight;
+
         const newBlock: MiningLog = {
           timestamp: new Date().toLocaleTimeString('id-ID'),
-          blockHeight: (recentBlocks[0]?.blockHeight || 842104) + 1,
+          blockHeight: nextHeight,
           nonce: Math.floor(Math.random() * 999999),
           hash: '00000000' + generateCryptoHash(56),
           reward: actualReward,
@@ -86,7 +90,7 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
       if (blockTimerRef.current) clearInterval(blockTimerRef.current);
       if (statsTimerRef.current) clearInterval(statsTimerRef.current);
     };
-  }, [config.isMiningActive, config.baseHashRate, config.boostMultiplier, recentBlocks]);
+  }, [config.isMiningActive, config.baseHashRate, config.boostMultiplier]);
 
   // Handle 24-hour countdown loop
   useEffect(() => {
@@ -224,14 +228,7 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
           </div>
         )}
 
-        {!config.isMiningActive && (
-          <div className="mt-6 p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 text-xs text-amber-200 leading-relaxed relative z-10 flex items-start gap-2">
-            <span className="text-amber-400 shrink-0">📌</span>
-            <p>
-              <strong>Sesi Pertambangan Siap Diaktifkan:</strong> Cukup klik tombol <strong>"Mulai Mining 24 Jam"</strong> di atas. Algoritma penambang otomatis akan berjalan selama 24 jam penuh. Anda bebas menutup peramban/browser, dan silakan kembali hari esok untuk memulai sesi penambangan harian berikutnya!
-            </p>
-          </div>
-        )}
+
 
         {/* Live Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-6 border-t border-zinc-800">

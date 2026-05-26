@@ -3,20 +3,45 @@ import { QrCode, CreditCard, RefreshCw, CheckCircle2, AlertTriangle, ArrowDownRi
 import { MiningConfig, DepositTransaction } from '../types';
 import { formatRupiah, generateCryptoHash, generateRandomCode } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+import QRCode from 'react-qr-code';
 
 interface QrisDepositProps {
   config: MiningConfig;
   setConfig: React.Dispatch<React.SetStateAction<MiningConfig>>;
   onAddLog: (log: string) => void;
+  userId?: string;
 }
 
-export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDepositProps) {
+export default function QrisDeposit({ config, setConfig, onAddLog, userId }: QrisDepositProps) {
   const [amountInput, setAmountInput] = useState<string>('20000');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [activeInvoice, setActiveInvoice] = useState<DepositTransaction | null>(null);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(300); // 5 minutes validity
   const [isPayingSimulated, setIsPayingSimulated] = useState<boolean>(false);
   const [depositSuccessMessage, setDepositSuccessMessage] = useState<string>('');
+
+  // Auto-resume active pending invoice from user's history on mount
+  useEffect(() => {
+    const pendingTx = config.depositHistory.find(d => d.status === 'Pending');
+    if (pendingTx && !activeInvoice) {
+      setActiveInvoice(pendingTx);
+      setSecondsRemaining(300);
+    }
+  }, [config.depositHistory]);
+
+  // Dynamic automatic check to pick up live database updates (polled every 3s via backend webhook processor)
+  useEffect(() => {
+    if (activeInvoice && activeInvoice.status === 'Pending') {
+      const liveTx = config.depositHistory.find(d => d.id === activeInvoice.id);
+      if (liveTx && liveTx.status !== 'Pending') {
+        setActiveInvoice(liveTx);
+        if (liveTx.status === 'Completed') {
+          setDepositSuccessMessage(`Selesai! Dana ${formatRupiah(liveTx.amount)} berhasil masuk ke Sisa Saldo Ter-settle (DANA)`);
+          setTimeout(() => setDepositSuccessMessage(''), 6000);
+        }
+      }
+    }
+  }, [config.depositHistory, activeInvoice]);
 
   // Countdown timer for pending QRIS invoice
   useEffect(() => {
@@ -55,53 +80,67 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
     }
 
     setIsGenerating(true);
-    // Simulate API delay
-    setTimeout(() => {
-      const qrisId = 'QRS-' + Math.floor(Math.random() * 89999 + 10000);
-      const newInvoice: DepositTransaction = {
-        id: qrisId,
-        timestamp: new Date().toLocaleTimeString('id-ID'),
-        amount: rawAmt,
-        paymentMethod: 'QRIS',
-        status: 'Pending',
-        referenceNumber: 'REF-' + generateRandomCode(12),
-      };
-
-      setActiveInvoice(newInvoice);
-      setSecondsRemaining(300); // Reset timer to 5 minutes
+    
+    // Server-side creation of a real pending transaction
+    fetch('/api/deposit/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: userId || 'UID-10002', // Standard demo user fallback if needed
+        amount: rawAmt
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
       setIsGenerating(false);
-      onAddLog(`[DEPOSIT] Invoice QRIS berhasil digenasi untuk nominal ${formatRupiah(rawAmt)} dengan ID Tag ${qrisId}. Silakan selesaikan pembayaran.`);
-    }, 1200);
+      if (data.success && data.invoice) {
+        setActiveInvoice(data.invoice);
+        setSecondsRemaining(300); // Reset timer to 5 minutes
+        onAddLog(`[DEPOSIT] Invoice QRIS berhasil digenerasi oleh server untuk nominal ${formatRupiah(rawAmt)} dengan ID Tag ${data.invoice.id}. Silakan lakukan pembayaran.`);
+      } else {
+        alert(data.error || 'Server gagal membuat tagihan deposit.');
+      }
+    })
+    .catch(err => {
+      setIsGenerating(false);
+      console.error(err);
+      alert('Gagal menghubungkan ke server deposit.');
+    });
   };
 
   const handleSimulatePayment = () => {
     if (!activeInvoice || activeInvoice.status !== 'Pending') return;
 
     setIsPayingSimulated(true);
-    onAddLog(`[DEPOSIT] Memproses simulasi pembayaran QRIS senilai ${formatRupiah(activeInvoice.amount)}... Menghubungi Gateway Bank.`);
+    onAddLog(`[DEPOSIT] Bank Gateway: Menginisiasi pengiriman callback Webhook status lunas (PAID) ke backend IPN server.`);
 
-    setTimeout(() => {
-      const updatedInvoice: DepositTransaction = {
-        ...activeInvoice,
-        status: 'Completed',
-      };
-
-      setActiveInvoice(updatedInvoice);
-
-      // Add to Sisa Saldo Ter-settle (DANA) and depositHistory
-      setConfig((prev) => ({
-        ...prev,
-        balanceEWallet: prev.balanceEWallet + activeInvoice.amount,
-        depositHistory: [updatedInvoice, ...prev.depositHistory],
-      }));
-
+    fetch('/api/webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        order_id: activeInvoice.id,
+        status: 'PAID',
+        amount: activeInvoice.amount
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
       setIsPayingSimulated(false);
-      setDepositSuccessMessage(`Selesai! Dana ${formatRupiah(activeInvoice.amount)} berhasil masuk ke Sisa Saldo Ter-settle (DANA)`);
-      onAddLog(`[DEPOSIT] Pembayaran QRIS #${activeInvoice.id} BERHASIL diverifikasi! ${formatRupiah(activeInvoice.amount)} langsung dikonfirmasi ke Sisa Saldo Ter-settle (DANA).`);
-      
-      // Clear success banner after some time
-      setTimeout(() => setDepositSuccessMessage(''), 6000);
-    }, 2000);
+      if (data.success) {
+        onAddLog(`[WEBHOOK] Callback Berhasil! Webhook server mendeteksi status lunas sebesar ${formatRupiah(activeInvoice.amount)} dan menyuntikkan saldo secara otomatis.`);
+      } else {
+        alert(data.error || 'Gagal memproses webhook.');
+      }
+    })
+    .catch(err => {
+      setIsPayingSimulated(false);
+      console.error(err);
+      alert('Gagal mengirimkan webhook.');
+    });
   };
 
   const formatTime = (secs: number) => {
@@ -259,64 +298,63 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
               <div className="relative py-4 px-6 rounded-xl bg-white border border-zinc-300 shadow-xl max-w-sm w-full flex flex-col items-center select-none text-zinc-950">
                 
                 {/* QRIS Brand Indicator */}
-                <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-zinc-300">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-black italic tracking-tighter text-indigo-900">QRIS</span>
-                    <span className="text-[6px] tracking-widest text-zinc-500 font-sans uppercase">QR Code Indonesian Standard</span>
+                <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-zinc-200">
+                  <div className="flex flex-col select-none">
+                    <div className="flex items-center">
+                      <span className="text-base font-black italic tracking-tighter text-[#0168b3]">QR</span>
+                      <span className="text-base font-black italic tracking-tighter text-[#f37021]">IS</span>
+                    </div>
+                    <span className="text-[5.5px] font-mono tracking-widest text-zinc-500 uppercase font-black">QR Code Indonesian Standard</span>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[8px] font-bold text-green-700">GPN</span>
-                    <span className="text-[5px] text-zinc-500 font-mono">NMI-IDR-A99</span>
+                  <div className="flex flex-col items-end select-none">
+                    <div className="flex items-center">
+                      <span className="text-xs font-black tracking-tighter text-red-600">GP</span>
+                      <span className="text-xs font-black tracking-tighter text-indigo-950">N</span>
+                    </div>
+                    <span className="text-[5px] text-zinc-400 font-mono">NMI-IDR-A99</span>
                   </div>
                 </div>
 
-                <div className="text-center space-y-0.5">
-                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider leading-none">MERCHANT: IDR COIN MINER NETWORK</h4>
+                <div className="text-center space-y-0.5 select-none">
+                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider leading-none text-zinc-900">MERCHANT: IDR COIN MINER NETWORK</h4>
                   <p className="text-[8px] text-zinc-500 font-mono">MEMBER OF SECURE VAULT ASIA</p>
                 </div>
 
                 {/* Simulated High-Fi QR Code */}
-                <div className="my-4 p-3 bg-zinc-50 border border-zinc-200 rounded-lg flex items-center justify-center relative">
+                <div className="my-4 p-4 bg-white border border-zinc-200/80 rounded-2xl flex flex-col items-center justify-center relative shadow-sm max-w-[210px] w-full">
                   
                   {activeInvoice.status === 'Pending' ? (
-                    /* Elegant pattern generation to make QR looked absolutely real with blocks */
-                    <div className="grid grid-cols-11 gap-0.5 w-40 h-40 bg-white p-1">
-                      {Array.from({ length: 121 }).map((_, i) => {
-                        // Create realistic corners (squares for QR anchor nodes)
-                        const row = Math.floor(i / 11);
-                        const col = i % 11;
-                        const isAnchor =
-                          (row < 3 && col < 3) ||
-                          (row < 3 && col > 7) ||
-                          (row > 7 && col < 3);
-                        
-                        // Fake randomized QR pixels representation
-                        const isActive = isAnchor || (i % 3 === 0 && i % 4 !== 0) || (i % 7 === 2 && col > 3);
-
-                        return (
-                          <div
-                            key={i}
-                            className={`rounded-sm transition-all duration-300 ${isAnchor ? 'bg-indigo-950' : isActive ? 'bg-zinc-900' : 'bg-transparent'}`}
-                          />
-                        );
-                      })}
+                    <div className="flex flex-col items-center w-full">
+                      {/* Real, Beautiful, Scannable Vector QR Code using react-qr-code */}
+                      <div className="relative flex items-center justify-center bg-white p-1 rounded-xl">
+                        <QRCode
+                          value="00020101021240490011ID.DANA.WWW01189360091531399885810208WARISMAN5204482953033605802ID5908WARISMAN6015Kab. Deli Serda61051279062460804DMCT993400020001242810120120260521314460666304F45D"
+                          size={144}
+                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                          viewBox="0 0 256 256"
+                        />
+                        {/* Center Sticker Logo styled exactly like DANA branding */}
+                        <div className="absolute h-8 w-8 bg-white rounded-md border border-zinc-200 flex items-center justify-center shadow-md overflow-hidden">
+                          <div className="bg-[#118EEA] w-full h-full flex flex-col items-center justify-center">
+                            <span className="text-[7.5px] font-black text-white leading-none font-sans tracking-wide uppercase">dana</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Bold "SCAN QRIS" label underneath matching the screenshot EXACTLY */}
+                      <span className="text-[11px] font-extrabold tracking-[0.25em] text-[#1e293b] font-sans mt-3.5 uppercase">
+                        SCAN QRIS
+                      </span>
                     </div>
                   ) : activeInvoice.status === 'Completed' ? (
-                    <div className="w-40 h-40 bg-zinc-100 flex flex-col items-center justify-center space-y-2">
+                    <div className="w-36 h-36 bg-zinc-50 flex flex-col items-center justify-center space-y-2 rounded-xl">
                       <CheckCircle2 className="h-12 w-12 text-emerald-500 animate-scale-in" />
                       <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest">LUNAS</span>
                     </div>
                   ) : (
-                    <div className="w-40 h-40 bg-zinc-100 flex flex-col items-center justify-center space-y-2">
+                    <div className="w-36 h-36 bg-zinc-50 flex flex-col items-center justify-center space-y-2 rounded-xl">
                       <AlertTriangle className="h-12 w-12 text-red-500" />
                       <span className="text-[11px] font-bold text-red-500 uppercase">EXPIRED</span>
-                    </div>
-                  )}
-
-                  {/* Tiny QR Logo center sticker */}
-                  {activeInvoice.status === 'Pending' && (
-                    <div className="absolute inset-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 bg-indigo-950 rounded-lg border border-white flex items-center justify-center shadow-lg">
-                      <span className="text-[8px] font-black text-white italic">IDR</span>
                     </div>
                   )}
                 </div>
@@ -333,15 +371,39 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
                 </div>
               </div>
 
-              {/* Simulation panel where user can self-pay the QRIS instantly */}
+              {/* Gateway panel where user can process the QRIS instantly */}
               {activeInvoice.status === 'Pending' && (
-                <div className="w-full bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-3">
-                  <div className="flex items-center gap-2 text-xs text-zinc-400">
-                    <ShieldAlert className="h-4 w-4 text-indigo-400 shrink-0 animate-bounce" />
-                    <span><strong>Simulator Pembayaran:</strong> Klik tombol di kanan untuk mensimulasikan transfer sukses dari e-wallet Anda ke QRIS merchant ini.</span>
+                <div className="w-full bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-4">
+                  <div className="flex items-start gap-2 text-xs text-zinc-400">
+                    <ShieldAlert className="h-4.5 w-4.5 text-indigo-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold text-zinc-200">Notifikasi Webhook Gateway Otomatis</p>
+                      <p className="text-[11px] text-zinc-400 leading-normal">
+                        Kirim notifikasi HTTP POST yang valid ke server API Anda <code>/api/webhook</code> untuk memicu persetujuan otomatis instan dari pihak bank/payment gateway.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex gap-3 justify-end">
+                  {/* Rest API JSON Payload block preview */}
+                  <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850 space-y-2">
+                    <div className="flex justify-between items-center text-[9px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
+                      <span>HTTP POST Payload (Webhook)</span>
+                      <span className="text-zinc-650">application/json</span>
+                    </div>
+                    <pre className="text-[10px] font-mono text-emerald-400 p-2 bg-zinc-900/40 rounded border border-zinc-850 select-all overflow-x-auto whitespace-pre leading-relaxed">
+{JSON.stringify({
+  order_id: activeInvoice.id,
+  status: "PAID",
+  amount: activeInvoice.amount
+}, null, 2)}
+                    </pre>
+                    <div className="flex items-center justify-between text-[9px] text-zinc-500 font-mono">
+                      <span>Target Endpoint: <strong className="text-zinc-300">/api/webhook</strong></span>
+                      <span>Status: Keamanan Terenkripsi</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-1">
                     <button
                       id="btn-cancel-invoice"
                       onClick={() => {
@@ -354,7 +416,7 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
                     </button>
 
                     <button
-                      id="btn-simulate-qris-payment"
+                      id="btn-process-qris-payment"
                       disabled={isPayingSimulated}
                       onClick={handleSimulatePayment}
                       className="px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-850 font-semibold text-xs text-zinc-950 flex items-center justify-center gap-1.5 shadow-md transition-all uppercase tracking-wide"
@@ -367,7 +429,7 @@ export default function QrisDeposit({ config, setConfig, onAddLog }: QrisDeposit
                       ) : (
                         <>
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          Bayar QRIS (Simulasi)
+                          Bayar QRIS & Kirim Webhook
                         </>
                       )}
                     </button>

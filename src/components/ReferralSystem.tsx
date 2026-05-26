@@ -43,19 +43,19 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
   };
 
   const simulateNewReferralGroup = (name?: string) => {
-    const friendName = name || generateRandomIndoName();
+    const friendName = name || invitedNameInput.trim() || generateRandomIndoName();
     const newFriendCode = generateRandomCode(8);
     
     const newFriend: ReferredUser = {
       id: 'REF-' + newFriendCode,
       username: friendName,
       joinedAt: new Date().toLocaleDateString('id-ID'),
-      hashRateBonus: 1.5, // 1.5 KH/s hash power boost
+      hashRateBonus: 0.5, // 0.5 KH/s hash power boost
       status: 'Active'
     };
 
-    // calculate rate
-    const updatedBase = config.baseHashRate + 1.5;
+    // Calculate rate
+    const updatedBase = config.baseHashRate + 0.5;
     const updatedMultiplier = config.boostMultiplier + 0.15; // +15% boost per referral invited
 
     setConfig(prev => ({
@@ -65,11 +65,11 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
       referrals: [newFriend, ...prev.referrals]
     }));
 
-    onAddLog(`[REFERRAL] Teman baru bergabung! ${friendName} telah mendaftar menggunakan kode Anda ${config.referralCode}. Kecepatan dasar bertambah +1.5 KH/s dan multiplier naik +15%.`);
+    onAddLog(`[REFERRAL] Teman baru bergabung! ${friendName} telah mendaftar menggunakan kode Anda ${config.referralCode}. Kecepatan dasar bertambah +0.5 KH/s dan multiplier naik +15%.`);
     setInvitedNameInput('');
   };
 
-  const totalReferralPowerBoost = (config.referrals.filter(r => r.status === 'Active').length * 1.5).toFixed(1);
+  const totalReferralPowerBoost = (config.referrals.filter(r => r.status === 'Active').length * 0.5).toFixed(1);
 
   return (
     <div className="space-y-6">
@@ -87,7 +87,7 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
               Undang Teman, Lipat Gandakan Pendapatan Koin Anda
             </h2>
             <p className="text-sm text-zinc-400 max-w-xl">
-              Setiap kali teman mendaftar menggunakan kode referral unik Anda, Anda mendapatkan tambahan kecepatan mining permanen <strong>+1.5 KH/s Bergaransi</strong> beserta bonus multiplier pendapatan koin.
+              Setiap kali teman mendaftar menggunakan kode referral unik Anda, Anda mendapatkan tambahan kecepatan mining permanen <strong>+0.5 KH/s Bergaransi</strong> beserta bonus multiplier pendapatan koin.
             </p>
           </div>
 
@@ -119,7 +119,7 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Fill Partner Referral / Simulated New Registrations */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 space-y-6 shadow-md">
+        <div className="rounded-2xl border border-zinc-850 bg-zinc-950 p-6 space-y-6 shadow-md">
           {/* Apply referral partner */}
           <div className="space-y-3">
             <h3 className="font-sans font-semibold text-white flex items-center gap-2">
@@ -138,13 +138,13 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
                 value={partnerCode}
                 onChange={(e) => setPartnerCode(e.target.value.toUpperCase())}
                 disabled={!!config.referredBy}
-                className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors uppercase font-mono tracking-widest w-full"
+                className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-650 focus:outline-none focus:border-indigo-500 transition-colors uppercase font-mono tracking-widest w-full"
               />
               <button
                 id="btn-claim-referral"
                 onClick={claimReferralCode}
                 disabled={!!config.referredBy || !partnerCode}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 px-4 py-2 rounded-lg font-medium text-xs text-white transition-colors flex items-center gap-1 shrink-0"
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-605 px-4 py-2 rounded-lg font-medium text-xs text-white transition-colors flex items-center gap-1 shrink-0"
               >
                 Klaim
                 <ArrowRight className="h-3 w-3" />
@@ -211,7 +211,7 @@ export default function ReferralSystem({ config, setConfig, onAddLog }: Referral
           <div className="pt-4 border-t border-zinc-900 mt-4 text-[10px] text-zinc-500 space-y-1">
             <div>Aturan Multiplier:</div>
             <div>• Kode referral berhasil diklaim: +25% Multiplier Pendapataran.</div>
-            <div>• Setiap kontak mendaftar: +1.5 KH/s ke kecepatan dasar & +15% multiplier pendanaan.</div>
+            <div>• Setiap kontak mendaftar: +0.5 KH/s ke kecepatan dasar & +15% multiplier pendanaan.</div>
           </div>
         </div>
       </div>
