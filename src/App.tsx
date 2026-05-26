@@ -17,7 +17,7 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState<string>('');
 
   // Local Simulated Users Database State
-  const [users, setUsers] = useState<UserAccount[]>([
+  const [users, _setUsers] = useState<UserAccount[]>([
     // Admin Account (Indra)
     {
       id: 'UID-10001',
@@ -101,6 +101,26 @@ export default function App() {
     }
   ]);
 
+  // Central Syncing wrapper that pushes mutations securely to database server REST API
+  const setUsers = (value: React.SetStateAction<UserAccount[]>) => {
+    _setUsers(prev => {
+      const nextUsers = typeof value === 'function' ? (value as any)(prev) : value;
+
+      // Persist to Express host backend DB
+      fetch('/api/users/save-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(nextUsers)
+      }).catch(err => {
+        console.error("Failed to sync database updates with server:", err);
+      });
+
+      return nextUsers;
+    });
+  };
+
   // Current Logged-in Session
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
 
@@ -131,23 +151,65 @@ export default function App() {
         }));
       }
 
-      // Propagate down to the main database array of users
+      const updatedUser = {
+        ...prevUser,
+        miningConfig: nextConfig
+      };
+
+      // Propagation via our wrapper automatically triggers server update
       setUsers(prevUsers => prevUsers.map(u => {
         if (u.id === prevUser.id) {
-          return {
-            ...u,
-            miningConfig: nextConfig
-          };
+          return updatedUser;
         }
         return u;
       }));
 
-      return {
-        ...prevUser,
-        miningConfig: nextConfig
-      };
+      return updatedUser;
     });
   };
+
+  // Real-time synchronization loop to listen for multi-device/multi-browser changes (polled every 3 seconds)
+  useEffect(() => {
+    let isMounted = true;
+
+    const pullDatabase = async () => {
+      try {
+        const res = await fetch('/api/users');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          _setUsers(data);
+        }
+      } catch (err) {
+        console.warn("Unable to pull database update:", err);
+      }
+    };
+
+    // Immediate initial sync
+    pullDatabase();
+
+    const fetchInterval = setInterval(pullDatabase, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(fetchInterval);
+    };
+  }, []);
+
+  // Sync current user session context with pull state updates (e.g., when approved by another device)
+  const currentUserId = currentUser?.id;
+  useEffect(() => {
+    if (!currentUserId) return;
+    const match = users.find(u => u.id === currentUserId);
+    if (match) {
+      setCurrentUser(prev => {
+        if (!prev) return null;
+        if (JSON.stringify(prev) !== JSON.stringify(match)) {
+          return match;
+        }
+        return prev;
+      });
+    }
+  }, [users, currentUserId]);
 
   // Log function
   const addLog = (message: string) => {

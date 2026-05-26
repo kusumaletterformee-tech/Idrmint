@@ -116,12 +116,26 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
         joinedAt: new Date().toLocaleDateString('id-ID')
       };
 
-      setUsers(prev => [...prev, newUser]);
-      setIsSubmitting(false);
-      
-      // Auto login newly registered account
-      onLoginSuccess(newUser);
-      onAddLog(`[AUTH] Registrasi sukses! Pengguna baru ${newUser.username} telah login.`);
+      fetch('/api/users/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      })
+      .then(res => res.json())
+      .then(() => {
+        setUsers(prev => [...prev, newUser]);
+        setIsSubmitting(false);
+        onLoginSuccess(newUser);
+        onAddLog(`[AUTH] Registrasi sukses! Pengguna baru ${newUser.username} telah login.`);
+      })
+      .catch(err => {
+        console.error("Failed to register with backend database:", err);
+        // Fallback to client-side registration anyway
+        setUsers(prev => [...prev, newUser]);
+        setIsSubmitting(false);
+        onLoginSuccess(newUser);
+        onAddLog(`[AUTH] Registrasi sukses (Offline)! Pengguna baru ${newUser.username} telah login.`);
+      });
     }, 1200);
   };
 
