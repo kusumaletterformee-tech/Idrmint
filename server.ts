@@ -437,6 +437,26 @@ async function startServer() {
     res.json(list);
   });
 
+  // API 1.5: Verify user password for secure server-side login
+  app.post("/api/users/login", (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username dan password diperlukan" });
+    }
+
+    const list = readDb();
+    const foundUser = list.find(
+      u => (u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()) && 
+      u.passwordHex === password
+    );
+
+    if (foundUser) {
+      res.json({ success: true, user: foundUser });
+    } else {
+      res.status(401).json({ error: "Username atau password salah." });
+    }
+  });
+
   // API 2: Create / Update a single user (Registers or Updates configs/deposits)
   app.post("/api/users/update", (req, res) => {
     const incoming: UserAccount = req.body;

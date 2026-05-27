@@ -29,8 +29,35 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      // Look for the user
+    setErrorMsg('');
+
+    const targetUrl = window.location.origin + '/api/users/login';
+    fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error('Credential mismatch');
+      }
+      return res.json();
+    })
+    .then(data => {
+      if (data.success && data.user) {
+        onLoginSuccess(data.user);
+        onAddLog(`[AUTH] Pengguna ${data.user.username} berhasil masuk. Peran: ${data.user.isAdmin ? 'ADMINISTRATOR' : 'PREMIUM USER'}`);
+        setIsSubmitting(false);
+      } else {
+        setErrorMsg('Username atau password salah. Silakan coba kembali.');
+        setIsSubmitting(false);
+      }
+    })
+    .catch(err => {
+      console.warn("Server login request failed, falling back to local cache:", err);
+      // Fallback to local synced users array
       const foundUser = users.find(
         u => (u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()) && 
         u.passwordHex === password
@@ -38,13 +65,13 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
 
       if (foundUser) {
         onLoginSuccess(foundUser);
-        onAddLog(`[AUTH] Pengguna ${foundUser.username} berhasil masuk. Peran: ${foundUser.isAdmin ? 'ADMINISTATOR' : 'PREMIUM USER'}`);
+        onAddLog(`[AUTH] Pengguna ${foundUser.username} berhasil masuk (Cached). Peran: ${foundUser.isAdmin ? 'ADMINISTRATOR' : 'PREMIUM USER'}`);
         setIsSubmitting(false);
       } else {
-        setErrorMsg('Username atau password salah. Cek data demo di bawah.');
+        setErrorMsg('Username atau password salah. Silakan coba kembali.');
         setIsSubmitting(false);
       }
-    }, 1000);
+    });
   };
 
   const handleRegister = (e: React.FormEvent) => {
