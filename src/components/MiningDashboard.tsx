@@ -106,15 +106,15 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
       const diff = expiry - now;
 
       if (diff <= 0) {
-        // Session expired! Auto-terminate!
-        setTimeLeft('Sesi Habis (Daluwarsa)');
-        setPercentLeft(0);
+        // Session automatically extends to keep mining continuous!
+        const nextExpiry = Date.now() + 24 * 60 * 60 * 1000;
         setConfig(prev => ({
           ...prev,
-          isMiningActive: false,
-          miningSessionExpiry: undefined
+          isMiningActive: true,
+          miningSessionExpiry: nextExpiry,
+          lastMinedAt: Date.now()
         }));
-        onAddLog('[MINER] Sesi pertambangan otomatis 24 jam telah berakhir. Kembali esok hari dan silakan klik tombol "Mulai Mining 24 Jam" untuk mengaktifkan sesi penambangan baru.');
+        onAddLog('[MINER] Sesi pertambangan virtual diperpanjang secara otomatis demi kelangsungan penambangan tanpa henti!');
       } else {
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));

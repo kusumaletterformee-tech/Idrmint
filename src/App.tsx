@@ -19,117 +19,31 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState<string>('');
 
   // Local Simulated Users Database State
-  const [users, _setUsers] = useState<UserAccount[]>([
-    // Admin Account (Indra)
-    {
-      id: 'UID-10001',
-      username: 'admin',
-      email: 'admin@idrminer.com',
-      passwordHex: 'admin123',
-      isAdmin: true,
-      joinedAt: '25/5/2026',
-      miningConfig: {
-        balancePenampungan: 0,
-        balanceEWallet: 0,
-        totalMined: 0,
-        baseHashRate: 15.0, // High starting power for demo admin
-        boostMultiplier: 1.0,
-        isMiningActive: false,
-        referralCode: 'IDR-ADMN',
-        referredBy: null,
-        referrals: [],
-        autoWithdrawActive: false,
-        targetEWallet: 'DANA',
-        walletNumber: '081211112222',
-        payoutThreshold: 10000,
-        payoutProgress: 0,
-        payoutHistory: [],
-        depositHistory: [],
-        privateKey: '',
-        publicKey: '',
-        machineActiveDays: 3,
-        rentedRigs: []
-      }
-    },
-    // Standard Demo Account (Joko)
-    {
-      id: 'UID-10002',
-      username: 'jokowow',
-      email: 'joko@gmail.com',
-      passwordHex: 'user123',
-      isAdmin: false,
-      joinedAt: '25/5/2026',
-      miningConfig: {
-        balancePenampungan: 18450, // Starting holding balance so the user immediately perceives progress
-        balanceEWallet: 54000, 
-        totalMined: 72450,
-        baseHashRate: 4.8, 
-        boostMultiplier: 1.0,
-        isMiningActive: true, 
-        referralCode: 'IDR-F7X8',
-        referredBy: null,
-        referrals: [],
-        autoWithdrawActive: true,
-        targetEWallet: 'DANA',
-        walletNumber: '081298765432',
-        payoutThreshold: 50000, 
-        payoutProgress: 36,
-        payoutHistory: [
-          {
-            id: 'TXN-842911',
-            userId: 'UID-10002',
-            username: 'jokowow',
-            timestamp: '25/5/2026, 14:12:00',
-            amount: 35000,
-            walletType: 'DANA',
-            walletNumber: '081298765432',
-            txHash: '0x3a8b417fcd9e02c59de104a8b7ddf2bb89a19c636f014e3da8f7c9e0cba002ae',
-            status: 'Completed'
-          }
-        ],
-        depositHistory: [
-          {
-            id: 'QRS-41829',
-            userId: 'UID-10002',
-            username: 'jokowow',
-            timestamp: '25/5/2026, 11:05:00',
-            amount: 25000,
-            paymentMethod: 'QRIS',
-            status: 'Completed',
-            referenceNumber: 'REF-XZ901248KLPB'
-          }
-        ],
-        privateKey: '',
-        publicKey: '',
-        machineActiveDays: 3,
-        rentedRigs: []
-      }
-    }
-  ]);
+  const [users, _setUsers] = useState<UserAccount[]>([]);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Central Syncing wrapper that pushes mutations securely to database server REST API
+  // Central Syncing wrapper that pushes mutations securely to database server REST API for modified/new users
   const setUsers = (value: React.SetStateAction<UserAccount[]>) => {
     _setUsers(prev => {
       const nextUsers = typeof value === 'function' ? (value as any)(prev) : value;
 
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      saveTimeoutRef.current = setTimeout(() => {
-        const targetUrl = window.location.origin + '/api/users/save-all';
-        fetch(targetUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(nextUsers)
-        }).catch(err => {
-          console.error("Failed to sync database updates with server:", err);
-        });
-      }, 1500); // 1.5 seconds debounce
+      // Identify modified or new users, and update them specifically in the database
+      const targetUrl = window.location.origin + '/api/users/update';
+      nextUsers.forEach((user: UserAccount) => {
+        const prevUser = prev.find(u => u.id === user.id);
+        if (!prevUser || JSON.stringify(prevUser) !== JSON.stringify(user)) {
+          fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(user)
+          }).catch(err => {
+            console.warn("Failed to update user on backend:", err);
+          });
+        }
+      });
 
       return nextUsers;
     });
@@ -138,8 +52,29 @@ export default function App() {
   // Current Logged-in Session
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
 
-  // Computed configuration bound to current session
-  const config = currentUser ? currentUser.miningConfig : users[1].miningConfig;
+  // Computed configuration bound to current session (with robust fallback)
+  const config = currentUser ? currentUser.miningConfig : (users[0]?.miningConfig || {
+    balancePenampungan: 0,
+    balanceEWallet: 0,
+    totalMined: 0,
+    baseHashRate: 4.8,
+    boostMultiplier: 1.0,
+    isMiningActive: false,
+    referralCode: '',
+    referredBy: null,
+    referrals: [],
+    autoWithdrawActive: false,
+    targetEWallet: 'DANA',
+    walletNumber: '',
+    payoutThreshold: 10000,
+    payoutProgress: 0,
+    payoutHistory: [],
+    depositHistory: [],
+    privateKey: '',
+    publicKey: '',
+    machineActiveDays: 3,
+    rentedRigs: []
+  });
 
   // Sync state helper to write back config modifications into both session and list
   const setConfig: React.Dispatch<React.SetStateAction<MiningConfig>> = (value) => {
@@ -170,8 +105,27 @@ export default function App() {
         miningConfig: nextConfig
       };
 
-      // Propagation via our wrapper automatically triggers server update
-      setUsers(prevUsers => prevUsers.map(u => {
+      // Propagation via our update API directly on save
+      const targetUrl = window.location.origin + '/api/users/update';
+      fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatedUser)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          _setUsers(prevUsers => prevUsers.map(u => u.id === prevUser.id ? data.user : u));
+        }
+      })
+      .catch(err => {
+        console.error("Failed to sync updated user with backend:", err);
+      });
+
+      // Local update propagation
+      _setUsers(prevUsers => prevUsers.map(u => {
         if (u.id === prevUser.id) {
           return updatedUser;
         }
@@ -261,26 +215,8 @@ export default function App() {
     setSystemLogs(prev => [`[${time}] ${message}`, ...prev.slice(0, 49)]);
   };
 
-  // Set up clock and asymmetric cryptographic node keys on start
+  // Set up clock on start
   useEffect(() => {
-    // Generate asymmetric security keys
-    const keys = generateKeyPair();
-    
-    // Set for our preloaded users
-    setUsers(prev => prev.map(u => {
-      if (!u.miningConfig.privateKey) {
-        return {
-          ...u,
-          miningConfig: {
-            ...u.miningConfig,
-            privateKey: keys.privateKey,
-            publicKey: keys.publicKey
-          }
-        };
-      }
-      return u;
-    }));
-
     // Start system clocks
     setCurrentTime(new Date().toLocaleTimeString('id-ID'));
     const timer = setInterval(() => {
@@ -367,6 +303,15 @@ export default function App() {
                     {currentUser.isAdmin ? 'ADMIN' : 'MEMBER'}
                   </span>
                 </div>
+                <button
+                  id="btn-logout"
+                  onClick={handleLogout}
+                  className="p-1 px-1.5 ml-1 select-none flex items-center gap-1 text-[10px] text-zinc-400 hover:text-red-400 rounded-lg hover:bg-zinc-800/60 border border-zinc-800 transition-colors"
+                  title="Keluar Sesi"
+                >
+                  <LogOut className="h-3 w-3" />
+                  <span>Keluar</span>
+                </button>
               </div>
             ) : (
               <div className="text-[10px] uppercase font-mono text-zinc-500 border border-zinc-900 px-2 py-1 rounded">

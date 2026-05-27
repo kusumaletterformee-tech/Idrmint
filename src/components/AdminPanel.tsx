@@ -189,7 +189,7 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
   };
 
   const pendingWithdrawalsCount = allWithdrawals.filter(w => w.withdrawal.status === 'Processing').length;
-  const pendingConfirmedDepositsCount = allDeposits.filter(d => d.deposit.status === 'Pending' && d.deposit.userConfirmed).length;
+  const pendingConfirmedDepositsCount = allDeposits.filter(d => d.deposit.status === 'Pending').length;
 
   return (
     <div className="space-y-6">

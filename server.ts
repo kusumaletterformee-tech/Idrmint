@@ -93,8 +93,38 @@ async function pullUsersFromFirebase() {
   }
 }
 
-// Default seed users (Admin Indra and Member Joko)
+// Default seed users (Admin Indra, Kusumax, and Member Joko)
 const DEFAULT_USERS: UserAccount[] = [
+  {
+    id: "UID-KUSUMAX",
+    username: "Kusumax",
+    email: "kusumax@idrminer.com",
+    passwordHex: "admin123",
+    isAdmin: true,
+    joinedAt: "27/5/2026",
+    miningConfig: {
+      balancePenampungan: 125000,
+      balanceEWallet: 500000,
+      totalMined: 625000,
+      baseHashRate: 20.0,
+      boostMultiplier: 1.0,
+      isMiningActive: true,
+      referralCode: "IDR-KUSUMAX",
+      referredBy: null,
+      referrals: [],
+      autoWithdrawActive: false,
+      targetEWallet: "DANA",
+      walletNumber: "081234567890",
+      payoutThreshold: 50000,
+      payoutProgress: 45,
+      payoutHistory: [],
+      depositHistory: [],
+      privateKey: "",
+      publicKey: "",
+      machineActiveDays: 3,
+      rentedRigs: []
+    }
+  },
   {
     id: "UID-10001",
     username: "admin",
@@ -221,9 +251,9 @@ function updateBackgroundMining(users: UserAccount[]): boolean {
         }
       }
 
-      // If session expired, terminate mining active state and lock lastMinedAt to expiry
+      // Automatically renew the 24-hour mining session so users don't have to keep clicking!
       if (now >= expiry) {
-        config.isMiningActive = false;
+        config.miningSessionExpiry = now + 24 * 60 * 60 * 1000;
         config.lastMinedAt = expiry;
         modified = true;
       }
@@ -238,9 +268,19 @@ function readDb(): UserAccount[] {
   try {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, "utf-8");
-      const list: UserAccount[] = JSON.parse(content);
+      let list: UserAccount[] = JSON.parse(content);
       
       let modified = updateBackgroundMining(list);
+
+      // Seed Kusumax if missing
+      const hasKusumax = list.some(u => u.username.toLowerCase() === "kusumax");
+      if (!hasKusumax) {
+        const kusumaxSeed = DEFAULT_USERS.find(u => u.username === "Kusumax");
+        if (kusumaxSeed) {
+          list.push(kusumaxSeed);
+          modified = true;
+        }
+      }
 
       // Auto upgrade schema to ensure everyone has machine fields recorded
       const upgraded = list.map(u => {
