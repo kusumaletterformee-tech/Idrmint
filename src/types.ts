@@ -60,8 +60,10 @@ export interface MiningConfig {
   privateKey: string; // Client-side simulated mining encryption private key
   publicKey: string;
   miningSessionExpiry?: number; // 24-hour cycle session expiry timestamp in ms
+  lastMinedAt?: number; // timestamp in ms of last background mining calculation
   machineActiveDays?: number;
   rentedRigs?: string[];
+  lastSettleWithdrawAt?: number;
 }
 
 export interface UserAccount {

@@ -356,7 +356,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* Profile Bar with session info or Logout trigger */}
+            {/* Profile Bar with session info */}
             {currentUser ? (
               <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl">
                 <div className="flex flex-col text-right">
@@ -365,14 +365,6 @@ export default function App() {
                     {currentUser.isAdmin ? 'ADMIN' : 'MEMBER'}
                   </span>
                 </div>
-                <button
-                  id="btn-logout"
-                  onClick={handleLogout}
-                  className="p-1.5 bg-zinc-950 hover:bg-red-950/30 text-zinc-400 hover:text-red-400 rounded-lg transition-colors border border-zinc-850"
-                  title="Keluar Sesi Aman"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
               </div>
             ) : (
               <div className="text-[10px] uppercase font-mono text-zinc-500 border border-zinc-900 px-2 py-1 rounded">

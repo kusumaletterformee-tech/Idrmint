@@ -15,20 +15,23 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [newSpeed, setNewSpeed] = useState<string>('');
   const [newBalance, setNewBalance] = useState<string>('');
+  const [newEWallet, setNewEWallet] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
 
   const startEditUser = (user: UserAccount) => {
     setEditingUser(user);
     setNewSpeed(user.miningConfig.baseHashRate.toString());
     setNewBalance(user.miningConfig.balancePenampungan.toString());
+    setNewEWallet((user.miningConfig.balanceEWallet || 0).toString());
   };
 
   const saveEditUser = () => {
     if (!editingUser) return;
     const speed = parseFloat(newSpeed);
     const balance = parseInt(newBalance);
+    const ewallet = parseInt(newEWallet);
 
-    if (isNaN(speed) || isNaN(balance)) {
+    if (isNaN(speed) || isNaN(balance) || isNaN(ewallet)) {
       alert('Mohon masukkan nominal angka kecepatan atau saldo yang valid.');
       return;
     }
@@ -38,7 +41,8 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
         const updatedConfig = {
           ...u.miningConfig,
           baseHashRate: speed,
-          balancePenampungan: balance
+          balancePenampungan: balance,
+          balanceEWallet: ewallet
         };
         const updatedUser = {
           ...u,
@@ -53,7 +57,7 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
       return u;
     }));
 
-    onAddLog(`[ADMIN] Mengedit profil ${editingUser.username}. Kecepatan diubah menjadi ${speed} KH/s dan Saldo Penampungan menjadi ${formatRupiah(balance)}`);
+    onAddLog(`[ADMIN] Mengedit profil ${editingUser.username}. Kecepatan diubah menjadi ${speed} KH/s, Saldo Penampungan menjadi ${formatRupiah(balance)}, dan Sisa Saldo ter-settle menjadi ${formatRupiah(ewallet)}`);
     setSuccessMsg(`Informasi pengguna ${editingUser.username} berhasil disimpan.`);
     setEditingUser(null);
     setTimeout(() => setSuccessMsg(''), 3000);
@@ -95,15 +99,15 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
 
         const depositAmount = u.miningConfig.depositHistory.find(d => d.id === depositId)?.amount || 0;
         
-        // Increase balancePenampungan on approval
-        const newBalance = action === 'Approve' 
-          ? u.miningConfig.balancePenampungan + depositAmount 
-          : u.miningConfig.balancePenampungan;
+        // Increase balanceEWallet on approval
+        const newEWalletBalance = action === 'Approve' 
+          ? u.miningConfig.balanceEWallet + depositAmount 
+          : u.miningConfig.balanceEWallet;
 
         const updatedConfig = {
           ...u.miningConfig,
           depositHistory: updatedDepositHistory,
-          balancePenampungan: newBalance
+          balanceEWallet: newEWalletBalance
         };
 
         const updatedUser = {
@@ -163,8 +167,30 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
+  const pendingWithdrawalsCount = allWithdrawals.filter(w => w.withdrawal.status === 'Processing').length;
+
   return (
     <div className="space-y-6">
+      {/* Pending Withdrawals Notification Banner */}
+      {pendingWithdrawalsCount > 0 && (
+        <div className="rounded-2xl border border-amber-950 bg-amber-950/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 bg-amber-950/60 border border-amber-800/50 rounded-lg flex items-center justify-center text-amber-500 shrink-0">
+              <RefreshCw className="h-4 w-4 animate-spin-slow text-amber-400" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white font-sans uppercase tracking-wide">⚠️ Penarikan Sisa Saldo Menunggu Persetujuan ({pendingWithdrawalsCount})</h4>
+              <p className="text-[10.5px] text-zinc-400 mt-0.5 leading-relaxed">
+                Terdapat {pendingWithdrawalsCount} pengajuan penarikan Sisa Saldo Ter-settle (PENDING) yang memerlukan otorisasi. Silakan tindak lanjuti keputusan di tabel penarikan di bawah.
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500 text-zinc-950">
+            AUDIT REQUIRED
+          </span>
+        </div>
+      )}
+
       {/* Admin Credentials Alert */}
       <div className="rounded-2xl border border-rose-950 bg-rose-950/10 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex gap-3">
@@ -271,7 +297,7 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[10px] text-zinc-400 font-mono uppercase mb-1">
                     Ubah Kecepatan Dasar (Base Hash Rate KH/s)
@@ -294,6 +320,18 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
                     value={newBalance}
                     onChange={(e) => setNewBalance(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-zinc-400 font-mono uppercase mb-1">
+                    Ubah Sisa Saldo Ter-settle (E-Wallet Virtual)
+                  </label>
+                  <input
+                    type="number"
+                    value={newEWallet}
+                    onChange={(e) => setNewEWallet(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-805 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>

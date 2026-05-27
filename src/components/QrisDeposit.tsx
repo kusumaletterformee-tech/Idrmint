@@ -114,7 +114,7 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
     if (!activeInvoice || activeInvoice.status !== 'Pending') return;
 
     setIsPayingSimulated(true);
-    onAddLog(`[DEPOSIT] Bank Gateway: Menginisiasi pengiriman callback Webhook status lunas (PAID) ke backend IPN server.`);
+    onAddLog(`[DEPOSIT] Simulasi transfer terdeteksi! Mengirimkan Callback Webhook otomatis (status: PAID) ke server API...`);
 
     fetch('/api/webhook', {
       method: 'POST',
@@ -131,15 +131,32 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
     .then(data => {
       setIsPayingSimulated(false);
       if (data.success) {
-        onAddLog(`[WEBHOOK] Callback Berhasil! Webhook server mendeteksi status lunas sebesar ${formatRupiah(activeInvoice.amount)} dan menyuntikkan saldo secara otomatis.`);
+        onAddLog(`[WEBHOOK] Callback Sukses! Server mendeteksi status lunas (PAID) untuk Invoice ${activeInvoice.id}. Dana ${formatRupiah(activeInvoice.amount)} disuntikkan secara otomatis.`);
+        setDepositSuccessMessage(`Pembayaran Berhasil! Webhook mendeteksi status PAID secara real-time. Saldo ${formatRupiah(activeInvoice.amount)} ditambahkan ke dompet.`);
+        setTimeout(() => setDepositSuccessMessage(''), 8500);
+
+        // Update local React state instantly
+        setConfig(prev => ({
+          ...prev,
+          balanceEWallet: prev.balanceEWallet + activeInvoice.amount,
+          depositHistory: prev.depositHistory.map(tx => {
+            if (tx.id === activeInvoice.id) {
+              return { ...tx, status: 'Completed' };
+            }
+            return tx;
+          })
+        }));
+        
+        // Update active invoice status locally
+        setActiveInvoice(prev => prev ? { ...prev, status: 'Completed' } : null);
       } else {
-        alert(data.error || 'Gagal memproses webhook.');
+        alert(data.error || 'Webhook gagal memproses transaksi.');
       }
     })
     .catch(err => {
       setIsPayingSimulated(false);
       console.error(err);
-      alert('Gagal mengirimkan webhook.');
+      alert('Gagal menghubungi Webhook endpoint.');
     });
   };
 
@@ -371,15 +388,15 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
                 </div>
               </div>
 
-              {/* Gateway panel where user can process the QRIS instantly */}
+              {/* Gateway panel where user can process the QRIS using automated webhooks */}
               {activeInvoice.status === 'Pending' && (
                 <div className="w-full bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-4">
                   <div className="flex items-start gap-2 text-xs text-zinc-400">
                     <ShieldAlert className="h-4.5 w-4.5 text-indigo-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="font-semibold text-zinc-200">Deteksi Otomatis & Konfirmasi Gateway</p>
+                      <p className="font-semibold text-zinc-200">Sistem Deteksi Otomatis & Callback Webhook</p>
                       <p className="text-[11px] text-zinc-400 leading-normal">
-                        Sistem gateway kami mendeteksi transfer Anda secara real-time di latar belakang melalui callback webhook aman. Jika Anda sudah berhasil memindai dan mentransfer dana, silakan tekan tombol <strong>"Konfirmasi Pembayaran"</strong> untuk memvalidasi status mutasi Anda secara instan.
+                        Sistem Kami terintegrasi langsung dengan API Payment Gateway. Setelah pembayaran terkirim lewat aplikasi seluler Anda (GoPay, DANA, LinkAja, dll), gateway akan secara otomatis mengirimkan callback pemberitahuan Webhook <code>status: PAID</code> ke server kami. Klik tombol di bawah untuk menyimulasikan notifikasi instan dari gateway ini.
                       </p>
                     </div>
                   </div>
@@ -400,17 +417,17 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
                       id="btn-process-qris-payment"
                       disabled={isPayingSimulated}
                       onClick={handleSimulatePayment}
-                      className="px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-850 font-semibold text-xs text-zinc-950 flex items-center justify-center gap-1.5 shadow-md transition-all uppercase tracking-wide"
+                      className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-850 font-semibold text-xs text-white flex items-center justify-center gap-1.5 shadow-md transition-all uppercase tracking-wide animate-pulse"
                     >
                       {isPayingSimulated ? (
                         <>
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          Memverifikasi Mutasi...
+                           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                           Memverifikasi Webhook...
                         </>
                       ) : (
                         <>
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Konfirmasi Pembayaran
+                           <CheckCircle2 className="h-3.5 w-3.5" />
+                           Bayar Sekarang (Simulasi Webhook)
                         </>
                       )}
                     </button>

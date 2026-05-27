@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "Premium mining user account profiles and transit holding configuration details",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique user ID prefix UID-"
+        },
+        "username": {
+          "type": "string",
+          "description": "Human readable username"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "passwordHex": {
+          "type": "string",
+          "description": "Stored password credential hash"
+        },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Whether this user has bypassing administrative controls"
+        },
+        "joinedAt": {
+          "type": "string",
+          "description": "Date registration string"
+        },
+        "miningConfig": {
+          "type": "object",
+          "description": "User wallet assets and live hash power settings"
+        }
+      },
+      "required": ["id", "username", "email", "passwordHex", "miningConfig"]
+    },
+    "transaction": {
+      "title": "Transaction",
+      "description": "Financial ledger document for user deposits and immigration wallet withdraws",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique transaction ID prefix TXN- or QRS-"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Associated user master key ID"
+        },
+        "username": {
+          "type": "string",
+          "description": "Username of the submitter"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Standard timestamp of the occurrence"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount transacted in Rupiah (IDR)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Whether deposit (QRIS) or payout (DANA/GOPAY/OVO/LINKAJA)"
+        },
+        "status": {
+          "type": "string",
+          "description": "State of transaction (Pending, Completed, Rejected, Failed)"
+        },
+        "referenceNumber": {
+          "type": "string",
+          "description": "Bank reference code or cryptographic blockchain hash"
+        }
+      },
+      "required": ["id", "userId", "username", "timestamp", "amount", "type", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Store premium user balances and automated offline mining speeds"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "transaction",
+      "description": "Immutable audit log of deposits and immigration withdraw transactions"
+    }
+  }
+}

@@ -94,6 +94,59 @@ const DEFAULT_USERS: UserAccount[] = [
   }
 ];
 
+// Helper to simulate background cloud mining when users are offline or browser is closed
+function updateBackgroundMining(users: UserAccount[]): boolean {
+  let modified = false;
+  const now = Date.now();
+
+  for (const user of users) {
+    const config = user.miningConfig;
+    if (config && config.isMiningActive && config.miningSessionExpiry) {
+      const expiry = config.miningSessionExpiry;
+      const startSession = expiry - 24 * 60 * 60 * 1000;
+      let lastMined = config.lastMinedAt ?? startSession;
+
+      if (lastMined < startSession) {
+        lastMined = startSession;
+      }
+
+      const endPoint = Math.min(now, expiry);
+
+      if (endPoint > lastMined) {
+        const elapsedMs = endPoint - lastMined;
+        const baseRate = config.baseHashRate || 4.8;
+        const mult = config.boostMultiplier || 1.0;
+
+        const intervalMs = Math.max(1000, 4000 - (baseRate * mult * 150));
+        const rewardBase = 12;
+        const actualReward = Math.round(rewardBase * (1 + (baseRate / 20)) * mult);
+        const rewardPerMs = actualReward / intervalMs;
+        const earned = elapsedMs * rewardPerMs;
+
+        if (earned >= 1) {
+          const earnedInt = Math.floor(earned);
+          config.balancePenampungan += earnedInt;
+          config.totalMined += earnedInt;
+
+          // Advance lastMinedAt precisely by the time used for the integer reward
+          const consumedMs = Math.floor(earnedInt / rewardPerMs);
+          config.lastMinedAt = lastMined + consumedMs;
+          modified = true;
+        }
+      }
+
+      // If session expired, terminate mining active state and lock lastMinedAt to expiry
+      if (now >= expiry) {
+        config.isMiningActive = false;
+        config.lastMinedAt = expiry;
+        modified = true;
+      }
+    }
+  }
+
+  return modified;
+}
+
 // Helper to load or initialize DB
 function readDb(): UserAccount[] {
   try {
@@ -101,8 +154,9 @@ function readDb(): UserAccount[] {
       const content = fs.readFileSync(DB_PATH, "utf-8");
       const list: UserAccount[] = JSON.parse(content);
       
+      let modified = updateBackgroundMining(list);
+
       // Auto upgrade schema to ensure everyone has machine fields recorded
-      let modified = false;
       const upgraded = list.map(u => {
         if (u.miningConfig.machineActiveDays === undefined || u.miningConfig.rentedRigs === undefined) {
           modified = true;
@@ -175,6 +229,24 @@ async function startServer() {
 
     writeDb(list);
     res.json({ success: true, user: incoming });
+  });
+
+  // API 3b: Handles logging session cleanup without resetting balances or mining state
+  app.post("/api/users/logout-reset", (req, res) => {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "UserId is required" });
+    }
+
+    const list = readDb();
+    const existingIndex = list.findIndex(u => u.id === userId);
+
+    if (existingIndex > -1) {
+      // Intentionally do NOT reset isMiningActive, balancePenampungan, or miningSessionExpiry
+      return res.json({ success: true, user: list[existingIndex] });
+    }
+
+    res.status(404).json({ error: "User not found" });
   });
 
   // API 3: Batch Update users (for bulk modifications, or fast synchronizers)

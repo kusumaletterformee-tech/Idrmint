@@ -138,6 +138,7 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
     setConfig(prev => {
       const nextActive = !prev.isMiningActive;
       const expiry = nextActive ? Date.now() + 24 * 60 * 60 * 1000 : undefined;
+      const nowTime = nextActive ? Date.now() : undefined;
       onAddLog(nextActive 
         ? '[MINER] Menghubungkan ke Pool IDR-Secure... Sesi aman 24 jam diaktifkan. Silakan kembali esok hari setelah waktu sesi habis untuk melanjutkan penambangan.' 
         : '[MINER] Penambangan dinonaktifkan sementara oleh pengguna.'
@@ -145,7 +146,8 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
       return { 
         ...prev, 
         isMiningActive: nextActive, 
-        miningSessionExpiry: expiry 
+        miningSessionExpiry: expiry,
+        lastMinedAt: nowTime
       };
     });
   };

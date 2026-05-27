@@ -19,6 +19,7 @@ interface UserTask {
   icon: React.ComponentType<any>;
   actionLabel: string;
   status: 'Ready' | 'Processing' | 'Completed';
+  url?: string;
 }
 
 export default function MiningTasks({ config, setConfig, onAddLog }: MiningTasksProps) {
@@ -41,7 +42,8 @@ export default function MiningTasks({ config, setConfig, onAddLog }: MiningTasks
       cashReward: 2000,
       icon: Send,
       actionLabel: 'Gabung Grup',
-      status: 'Ready'
+      status: 'Ready',
+      url: 'https://t.me/mintdrix'
     },
     {
       id: 'task-whatsapp',
@@ -71,7 +73,8 @@ export default function MiningTasks({ config, setConfig, onAddLog }: MiningTasks
       cashReward: 1000,
       icon: Youtube,
       actionLabel: 'Subscribe YouTube',
-      status: 'Ready'
+      status: 'Ready',
+      url: 'https://youtube.com/shorts/oH3EA4lPYCc?si=j9pJzEEam0Ez_hGj'
     }
   ]);
 
@@ -95,6 +98,15 @@ export default function MiningTasks({ config, setConfig, onAddLog }: MiningTasks
 
   const runTaskAction = (task: UserTask) => {
     if (task.status !== 'Ready') return;
+
+    // Open URL in new window/tab if present
+    if (task.url) {
+      try {
+        window.open(task.url, '_blank', 'noopener,noreferrer');
+      } catch (e) {
+        console.error('Failed to open task link', e);
+      }
+    }
 
     // Set to processing
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'Processing' } : t));

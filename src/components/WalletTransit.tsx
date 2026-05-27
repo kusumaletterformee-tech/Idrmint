@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Settings, ArrowDownRight, RefreshCw, Send, CheckCircle2, CircleDollarSign, ShieldAlert, ListFilter, Lock } from 'lucide-react';
+import { Wallet, Settings, ArrowDownRight, RefreshCw, Send, CheckCircle2, CircleDollarSign, ShieldAlert, ListFilter, Lock, AlertTriangle } from 'lucide-react';
 import { MiningConfig, EWalletType, PayoutTransaction } from '../types';
 import { formatRupiah, generateCryptoHash } from '../utils';
 
@@ -13,6 +13,40 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
   const [phoneError, setPhoneError] = useState<string>('');
   const [isProcessingManual, setIsProcessingManual] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
+
+  const [isProcessingSettleWithdraw, setIsProcessingSettleWithdraw] = useState<boolean>(false);
+  const [isLimitSettlePopupOpen, setIsLimitSettlePopupOpen] = useState<boolean>(false);
+  const [settleWithdrawAmount, setSettleWithdrawAmount] = useState<string>('10000');
+  const [settleError, setSettleError] = useState<string>('');
+  const [settleSuccess, setSettleSuccess] = useState<string>('');
+  const [isLockModalOpen, setIsLockModalOpen] = useState<boolean>(false);
+  
+  const [acknowledgedPayouts, setAcknowledgedPayouts] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('acknowledged_payouts') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [approvedPayoutNotify, setApprovedPayoutNotify] = useState<PayoutTransaction | null>(null);
+
+  useEffect(() => {
+    const approvedTx = config.payoutHistory.find(
+      tx => tx.status === 'Completed' && !acknowledgedPayouts.includes(tx.id)
+    );
+    if (approvedTx) {
+      setApprovedPayoutNotify(approvedTx);
+    }
+  }, [config.payoutHistory, acknowledgedPayouts]);
+
+  const acknowledgePopup = (txId: string) => {
+    const updated = [...acknowledgedPayouts, txId];
+    setAcknowledgedPayouts(updated);
+    localStorage.setItem('acknowledged_payouts', JSON.stringify(updated));
+    setApprovedPayoutNotify(null);
+  };
+
+  const hasM30S = config.rentedRigs?.includes('rig-silver') || false;
 
   // Auto Payout Simulation Core Effect
   // If Auto-Withdraw is active and the "balancePenampungan" exceeds the specified threshold, 
@@ -102,6 +136,70 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
     }, 2000);
   };
 
+  const executeSettleWithdraw = () => {
+    const amount = parseInt(settleWithdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setSettleError('Masukkan jumlah penarikan yang valid.');
+      return;
+    }
+
+    if (amount > 10000) {
+      setSettleError('Batas penarikan harian terlampaui. Anda hanya diperbolehkan menarik maksimal Rp 10.000 per hari (1x24 jam).');
+      setIsLimitSettlePopupOpen(true);
+      return;
+    }
+
+    const now = Date.now();
+    const lastWithdraw = config.lastSettleWithdrawAt || 0;
+    const cooldownPeriod = 24 * 60 * 60 * 1000;
+    
+    if (now - lastWithdraw < cooldownPeriod) {
+      const remainingMs = cooldownPeriod - (now - lastWithdraw);
+      const hours = Math.floor(remainingMs / (60 * 60 * 1000));
+      const minutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+      setSettleError(`Batas Siklus 24 Jam Aktif! Anda hanya diperbolehkan melakukan penarikan Sisa Saldo Ter-settle sekali sehari. Sisa waktu tunggu: ${hours} jam ${minutes} menit.`);
+      setIsLimitSettlePopupOpen(true);
+      return;
+    }
+
+    if (config.balanceEWallet < amount) {
+      setSettleError(`Saldo Sisa Ter-settle Anda tidak mencukupi. Saldo saat ini: ${formatRupiah(config.balanceEWallet)}`);
+      return;
+    }
+
+    if (config.walletNumber.length < 9) {
+      setSettleError('Mohon pasang nomor HP e-wallet aktif terlebih dahulu sebelum mengajukan penarikan.');
+      return;
+    }
+
+    setSettleError('');
+    setIsProcessingSettleWithdraw(true);
+
+    setTimeout(() => {
+      const newTx: PayoutTransaction = {
+        id: 'TXN-' + Math.floor(Math.random() * 899999 + 100000),
+        timestamp: new Date().toLocaleString('id-ID'),
+        amount: amount,
+        walletType: config.targetEWallet,
+        walletNumber: config.walletNumber,
+        txHash: '0x' + generateCryptoHash(64),
+        status: 'Processing' // "pending / complete"
+      };
+
+      setConfig(prev => ({
+        ...prev,
+        balanceEWallet: Math.max(0, prev.balanceEWallet - amount),
+        lastSettleWithdrawAt: now,
+        payoutHistory: [newTx, ...prev.payoutHistory]
+      }));
+
+      setIsProcessingSettleWithdraw(false);
+      setSettleSuccess(`Permintaan penarikan ${formatRupiah(amount)} sukses dibuat! Menunggu persetujuan admin (Pending).`);
+      onAddLog(`[WITHDRAW-SETTLE] Mengirim pengajuan penarikan sisa saldo ter-settle senilai ${formatRupiah(amount)} ke ${config.targetEWallet}. Status: PENDING.`);
+      setTimeout(() => setSettleSuccess(''), 6050);
+    }, 1500);
+  };
+
   const percentageToThreshold = Math.min(100, Math.round((config.balancePenampungan / config.payoutThreshold) * 100));
 
   return (
@@ -142,14 +240,14 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
                 </span>
               </div>
               <p className="text-[10.5px] text-zinc-400 leading-relaxed font-sans">
-                Setiap hasil penambangan koin Rupiah virtual otomatis ditampung di sini. Sistem imigrasi koin ke E-Wallet tujuan akan terbuka otomatis di latar belakang setelah saldo akun Anda mencapai target minimal <strong>{formatRupiah(450000)} (450K koin)</strong>.
+                Setiap hasil penambangan koin Rupiah virtual otomatis ditampung di sini. Sistem imigrasi koin ke E-Wallet tujuan akan terbuka otomatis setelah saldo akun Anda mencapai target.
               </p>
 
               {/* Progress Bar & Status */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between items-center text-[9px] font-mono text-zinc-500">
-                  <span>Progres Akumulasi:</span>
-                  <span className="text-zinc-300 font-bold">{formatRupiah(config.balancePenampungan)} / {formatRupiah(450000)}</span>
+                  <span>Progres Imigrasi:</span>
+                  <span className="text-zinc-300 font-bold">{Math.min(100, Math.round((config.balancePenampungan / 450000) * 100))}%</span>
                 </div>
                 <div className="w-full bg-zinc-950 rounded-full h-1.5 overflow-hidden border border-zinc-900">
                   <div 
@@ -196,6 +294,116 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
               <div className="text-xs font-mono text-zinc-300 font-medium tracking-wider">
                 {config.walletNumber ? config.walletNumber : '(Nomor e-wallet belum terpasang)'}
               </div>
+            </div>
+          </div>
+
+          {/* Form Penarikan Sisa Saldo Ter-settle (DANA) - Tampilan seperti Periodic Auto-Withdraw */}
+          <div className="rounded-2xl border border-zinc-805 bg-zinc-950 p-6 relative overflow-hidden shadow-md space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+              <span className="text-xs font-semibold font-sans text-white flex items-center gap-1.5">
+                <Send className="h-3.5 w-3.5 text-indigo-400" />
+                Penarikan Sisa Saldo Ter-settle ({config.targetEWallet})
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-950 text-[10px] text-indigo-400 font-mono border border-indigo-900/30">
+                Audit Manual
+              </span>
+            </div>
+
+            {settleSuccess && (
+              <div className="p-2.5 bg-emerald-950/20 text-emerald-400 border border-emerald-800/30 rounded-lg text-[11px] leading-snug">
+                {settleSuccess}
+              </div>
+            )}
+
+            {settleError && (
+              <p className="text-[11px] text-red-400 bg-red-950/15 border border-red-900/20 p-2.5 rounded-lg leading-snug">
+                {settleError}
+              </p>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-mono text-zinc-500 uppercase mb-1">
+                  Preset Nominal Penarikan (Maks Rp 10.000)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {['5000', '7000', '10000'].map((val) => (
+                    <button
+                      key={val}
+                      id={`btn-preset-settle-${val}`}
+                      onClick={() => {
+                        setSettleWithdrawAmount(val);
+                        setSettleError('');
+                      }}
+                      className={`py-1.5 px-1 text-center rounded text-[10px] font-mono border transition-all ${
+                        settleWithdrawAmount === val
+                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/50 font-bold'
+                          : 'bg-zinc-90 w-full hover:bg-zinc-900 border-zinc-900 text-zinc-400 text-xs'
+                      }`}
+                    >
+                      {formatRupiah(parseInt(val))}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-mono text-zinc-500 uppercase">
+                  Atur Nominal Penarikan Sisa Saldo (Rp)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1.5 text-zinc-500 font-mono text-xs">Rp</span>
+                  <input
+                    type="number"
+                    max="10000"
+                    placeholder="Contoh: 10000"
+                    value={settleWithdrawAmount}
+                    onChange={(e) => {
+                      setSettleWithdrawAmount(e.target.value);
+                      setSettleError('');
+                    }}
+                    className="w-full bg-zinc-900 border border-zinc-850 rounded py-1.5 pl-8 pr-2.5 text-xs text-white font-mono placeholder-zinc-700 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Payout Details telemetry panel */}
+              <div className="p-3 bg-zinc-900/60 border border-zinc-855 rounded-xl space-y-1.5 text-[10px] font-sans text-zinc-400 leading-normal">
+                <div className="flex justify-between">
+                  <span>Target HP:</span>
+                  <span className="font-mono text-zinc-200">{config.walletNumber || '(Lengkapi nomor HP)'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Batas Harian:</span>
+                  <span className="text-amber-500">Maks Rp 10.000 / Hari</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Jeda Penarikan:</span>
+                  <span className="text-zinc-355">1x24-jam Kerja</span>
+                </div>
+                <p className="text-[9px] text-zinc-500 pt-1 border-t border-zinc-850 leading-relaxed italic">
+                  *Dana penarikan otomatis masuk dalam antrean audit administrator sebelum disetujui (complete).
+                </p>
+              </div>
+
+              <button
+                id="btn-settle-withdraw-submit"
+                disabled={isProcessingSettleWithdraw || config.balanceEWallet < 1000 || !config.walletNumber}
+                onClick={executeSettleWithdraw}
+                className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-900 disabled:text-zinc-650 font-semibold text-xs text-white flex items-center justify-center gap-1.5 rounded-lg transition-all uppercase tracking-wider shadow-md"
+              >
+                {isProcessingSettleWithdraw ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Memproses Pengajuan...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3 w-3" />
+                    Ajukan Penarikan Ter-settle
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -336,31 +544,55 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
 
             {/* Fast Payout Manual Core Button */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-zinc-900">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <ShieldAlert className="h-4 w-4 text-amber-500" />
-                <span className="text-[11px] leading-relaxed">
-                  Apakah Anda ingin menarik saldo instan tanpa menunggu ambang batas otomatis?
+              <div className="flex flex-col gap-1 text-left">
+                <div className="flex items-center gap-2">
+                  {hasM30S ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-[10px] text-emerald-400 font-bold border border-emerald-800/20 flex items-center gap-1">
+                      👑 UNLOCKED (M30S Aktif)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-red-950 text-[10px] text-red-400 font-bold border border-red-900/20 flex items-center gap-1">
+                      🔒 FITUR TERKUNCI (WhatsMiner M30S Diperlukan)
+                    </span>
+                  )}
+                  <span className="text-[11px] font-sans font-semibold text-zinc-300">
+                    Sistem Transfer Instan Saldo Penampungan
+                  </span>
+                </div>
+                <span className="text-[11px] text-zinc-500 leading-relaxed font-sans mt-0.5">
+                  Apakah Anda ingin menarik saldo imigrasi secara instan seketika tanpa menunggu target progres 100%?
                 </span>
               </div>
 
-              <button
-                id="btn-manual-withdraw"
-                disabled={isProcessingManual || config.balancePenampungan <= 0 || config.walletNumber.length < 9}
-                onClick={executeManualWithdraw}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 font-medium text-xs text-white flex items-center justify-center gap-2 shadow-md transition-colors"
-              >
-                {isProcessingManual ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    Menghubungkan Node...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5" />
-                    Tarik Instan Saldo Penampungan
-                  </>
-                )}
-              </button>
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                <button
+                  id="btn-manual-withdraw"
+                  disabled={isProcessingManual || (hasM30S && (config.balancePenampungan <= 0 || config.walletNumber.length < 9))}
+                  onClick={hasM30S ? executeManualWithdraw : () => setIsLockModalOpen(true)}
+                  className={`w-full sm:w-auto px-5 py-2.5 rounded-lg font-semibold text-xs text-white flex items-center justify-center gap-2 shadow-md transition-all ${
+                    hasM30S 
+                      ? 'bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600'
+                      : 'bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300'
+                  }`}
+                >
+                  {isProcessingManual ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      Menghubungkan Node...
+                    </>
+                  ) : !hasM30S ? (
+                    <>
+                      <Lock className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                      Tarik Instan (Terkunci)
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      Tarik Instan Saldo Penampungan
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -408,9 +640,19 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
                       {tx.txHash.substring(0, 18)}...
                     </td>
                     <td className="py-3 text-right">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/40 text-emerald-400 text-[10px] font-sans font-medium border border-emerald-900/30">
-                        <CheckCircle2 className="h-3 w-3" />
-                        {tx.status}
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-sans font-medium border ${
+                        tx.status === 'Completed'
+                          ? 'bg-emerald-955 bg-emerald-950/40 text-emerald-400 border-emerald-900/30'
+                          : tx.status === 'Processing'
+                          ? 'bg-amber-950/45 text-amber-500 border-amber-900/30 animate-pulse'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-805'
+                      }`}>
+                        {tx.status === 'Completed' ? (
+                          <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                        ) : tx.status === 'Processing' ? (
+                          <RefreshCw className="h-3 w-3 text-amber-500 animate-spin" />
+                        ) : null}
+                        {tx.status === 'Processing' ? 'PENDING' : tx.status}
                       </span>
                     </td>
                   </tr>
@@ -420,6 +662,159 @@ export default function WalletTransit({ config, setConfig, onAddLog }: WalletTra
           </div>
         )}
       </div>
+
+      {/* Lock Dialog Modal Overlay */}
+      {isLockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-zinc-350">
+          <div className="bg-zinc-950 border border-zinc-90 w-full max-w-sm p-6 rounded-2xl border-zinc-800 text-center space-y-4 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 -m-8 h-32 w-32 rounded-full bg-amber-500/5 blur-3xl pointer-events-none"></div>
+            <div className="h-14 w-14 bg-amber-950/40 border border-amber-800/40 rounded-full flex items-center justify-center mx-auto text-amber-500">
+              <Lock className="h-7 w-7 animate-bounce" />
+            </div>
+            
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold text-white font-sans tracking-tight">🔒 Akses Penarikan Instan Terkunci!</h4>
+              <p className="text-xs leading-relaxed font-sans text-zinc-400">
+                Sistem mendeteksi bahwa akun Anda belum memiliki hardware penambangan utama <strong className="text-indigo-400">WhatsMiner M30S (Medium)</strong>.
+              </p>
+              <p className="text-[11px] text-zinc-550 leading-relaxed">
+                Anda diwajibkan menyewa atau memiliki mesin WhatsMiner M30S untuk mengaktifkan izin enkripsi imigrasi koin secara permanen pada tombol ini.
+              </p>
+            </div>
+
+            <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-850 space-y-2 text-left font-mono text-[10px] text-zinc-400">
+              <div className="flex justify-between">
+                <span>Hardware Diperlukan:</span>
+                <span className="text-pink-400 font-bold">WhatsMiner M30S</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Kecepatan Tambahan:</span>
+                <span className="text-indigo-400 font-bold">+45.0 KH/s</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Harga Sewa:</span>
+                <span className="text-emerald-400 font-bold">Rp 45.000</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                id="btn-shop-shortcut"
+                onClick={() => {
+                  setIsLockModalOpen(false);
+                  onAddLog('[WITHDRAW] Terkunci: Silakan buka tab Hardware Shop untuk menyewa mesin WhatsMiner M30S.');
+                }}
+                className="flex-1 py-1.5 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-lg text-xs transition-colors"
+              >
+                Buka Hardware Shop
+              </button>
+              
+              <button
+                id="btn-close-lock-modal"
+                onClick={() => setIsLockModalOpen(false)}
+                className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 rounded-lg text-xs transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settle Daily Limit Warning Overlay */}
+      {isLimitSettlePopupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl relative overflow-hidden text-zinc-350">
+            <div className="absolute top-0 right-0 -m-8 h-32 w-32 rounded-full bg-red-500/5 blur-3xl pointer-events-none"></div>
+            <div className="h-14 w-14 bg-rose-950/50 border border-rose-800/60 rounded-full flex items-center justify-center mx-auto text-red-400">
+              <AlertTriangle className="h-8 w-8 text-rose-400 shrink-0 animate-pulse" />
+            </div>
+            
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-bold text-white font-sans tracking-tight">⚠️ Batas Penarikan Harian</h4>
+              <p className="text-xs leading-relaxed font-sans text-zinc-400">
+                {settleError || 'Anda hanya diperbolehkan melakukan penarikan Sisa Saldo Ter-settle maksimal Rp 10.000 per hari (1x24 jam).'}
+              </p>
+            </div>
+
+            <div className="p-3 bg-red-950/10 border border-red-900/20 rounded-xl text-left text-[11px] font-sans text-red-300/80 leading-relaxed space-y-1">
+              <p className="font-bold">Ketentuan Pengguna (Anti-Spam):</p>
+              <p>1. Penarikan maksimal per 24 jam adalah Rp 10.000.</p>
+              <p>2. Siklus pending / complete dikawal manual lewat verifikasi admin 1x24 jam.</p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                id="btn-reset-cooldown-demo"
+                onClick={() => {
+                  setConfig(prev => ({ ...prev, lastSettleWithdrawAt: 0 }));
+                  setSettleError('');
+                  setIsLimitSettlePopupOpen(false);
+                  onAddLog('[DEMO] Limit harian & Cooldown 24-jam berhasil direset untuk keperluan pengujian!');
+                }}
+                className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white rounded-lg text-[10px] transition-colors font-medium"
+                title="Sangat berguna untuk penguji"
+              >
+                Bypass Limit (Demo)
+              </button>
+              
+              <button
+                id="btn-close-limit-popup"
+                onClick={() => setIsLimitSettlePopupOpen(false)}
+                className="flex-1 py-1.5 bg-rose-950 hover:bg-rose-900 border border-rose-900/30 text-rose-300 font-semibold rounded-lg text-xs transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Approved Confirmation Overlay */}
+      {approvedPayoutNotify && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-zinc-350">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 -m-8 h-32 w-32 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none"></div>
+            <div className="h-14 w-14 bg-emerald-950/50 border border-emerald-800/60 rounded-full flex items-center justify-center mx-auto text-emerald-400">
+              <CheckCircle2 className="h-8 w-8 animate-bounce" />
+            </div>
+            
+            <div className="space-y-1.5">
+              <h4 className="text-base font-bold text-white font-sans tracking-tight">🎉 Penarikan Disetujui!</h4>
+              <p className="text-xs leading-relaxed text-zinc-400">
+                Kabar gembira! Permintaan penarikan sisa saldo ter-settle Anda telah berhasil divalidasi dan <strong className="text-emerald-405">disetujui</strong> oleh sistem administrator.
+              </p>
+            </div>
+
+            <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl text-left text-xs space-y-2 font-mono text-zinc-300">
+              <div className="flex justify-between">
+                <span className="text-zinc-500 text-[10px]">ID TRX:</span>
+                <span className="font-bold text-indigo-400">{approvedPayoutNotify.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500 text-[10px]">Waktu:</span>
+                <span>{approvedPayoutNotify.timestamp}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500 text-[10px]">E-Wallet:</span>
+                <span>{approvedPayoutNotify.walletType} ({approvedPayoutNotify.walletNumber})</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-zinc-800 text-emerald-400 font-bold">
+                <span className="text-zinc-500 text-[10px] font-normal">NOMINAL:</span>
+                <span>{formatRupiah(approvedPayoutNotify.amount)}</span>
+              </div>
+            </div>
+
+            <button
+              id="btn-close-approved-popup"
+              onClick={() => acknowledgePopup(approvedPayoutNotify.id)}
+              className="w-full py-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-605 hover:to-indigo-505 text-white font-semibold rounded-lg text-xs transition-colors shadow-md"
+            >
+              Klaim & Selesai
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
