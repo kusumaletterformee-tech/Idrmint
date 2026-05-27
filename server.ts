@@ -72,7 +72,7 @@ async function pullUsersFromFirebase() {
         for (const fbUser of firebaseUsers) {
           const idx = mergedUsers.findIndex(u => u.id === fbUser.id);
           if (idx > -1) {
-            mergedUsers[idx] = fbUser;
+            mergedUsers[idx] = mergeSingleUser(mergedUsers[idx], fbUser);
             changes = true;
           } else {
             mergedUsers.push(fbUser);
@@ -285,6 +285,68 @@ function writeDb(users: UserAccount[]) {
   }
 }
 
+// Smart merger to prevent multi-session and multi-browser race conditions from overwriting/downgrading records
+function mergeHistories(existing: any[] | undefined, incoming: any[] | undefined): any[] {
+  const list = [...(existing || [])];
+  const incomingItems = incoming || [];
+  for (const inc of incomingItems) {
+    const idx = list.findIndex(item => item.id === inc.id);
+    if (idx > -1) {
+      const currentStatus = list[idx].status;
+      const incomingStatus = inc.status;
+      // Do not allow status downgrade (e.g. Completed -> Pending)
+      const finalStatus = (currentStatus === "Completed" && incomingStatus === "Pending") ? "Completed" : incomingStatus;
+      
+      list[idx] = { 
+        ...list[idx], 
+        ...inc,
+        status: finalStatus,
+        userConfirmed: list[idx].userConfirmed || inc.userConfirmed
+      };
+    } else {
+      list.unshift(inc);
+    }
+  }
+  return list;
+}
+
+function mergeRigs(existing: any[] | undefined, incoming: any[] | undefined): any[] {
+  const list = [...(existing || [])];
+  const incomingItems = incoming || [];
+  for (const inc of incomingItems) {
+    const idx = list.findIndex(item => item.id === inc.id);
+    if (idx > -1) {
+      list[idx] = { ...list[idx], ...inc };
+    } else {
+      list.push(inc);
+    }
+  }
+  return list;
+}
+
+function mergeSingleUser(existing: UserAccount, incoming: UserAccount): UserAccount {
+  const existingConfig = (existing.miningConfig || {}) as any;
+  const incomingConfig = (incoming.miningConfig || {}) as any;
+
+  const mergedConfig = {
+    ...existingConfig,
+    ...incomingConfig,
+    balancePenampungan: Math.max(existingConfig.balancePenampungan || 0, incomingConfig.balancePenampungan || 0),
+    balanceEWallet: Math.max(existingConfig.balanceEWallet || 0, incomingConfig.balanceEWallet || 0),
+    totalMined: Math.max(existingConfig.totalMined || 0, incomingConfig.totalMined || 0),
+    payoutProgress: Math.max(existingConfig.payoutProgress || 0, incomingConfig.payoutProgress || 0),
+    depositHistory: mergeHistories(existingConfig.depositHistory, incomingConfig.depositHistory),
+    payoutHistory: mergeHistories(existingConfig.payoutHistory, incomingConfig.payoutHistory),
+    rentedRigs: mergeRigs(existingConfig.rentedRigs, incomingConfig.rentedRigs)
+  };
+
+  return {
+    ...existing,
+    ...incoming,
+    miningConfig: mergedConfig as any
+  };
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -346,13 +408,13 @@ async function startServer() {
     const existingIndex = list.findIndex(u => u.id === incoming.id);
 
     if (existingIndex > -1) {
-      list[existingIndex] = incoming;
+      list[existingIndex] = mergeSingleUser(list[existingIndex], incoming);
     } else {
       list.push(incoming);
     }
 
     writeDb(list);
-    res.json({ success: true, user: incoming });
+    res.json({ success: true, user: list[existingIndex > -1 ? existingIndex : list.length - 1] });
   });
 
   // API 3b: Handles logging session cleanup without resetting balances or mining state
@@ -377,8 +439,17 @@ async function startServer() {
   app.post("/api/users/save-all", (req, res) => {
     const list = req.body;
     if (Array.isArray(list)) {
-      writeDb(list);
-      return res.json({ success: true, count: list.length });
+      const currentList = readDb();
+      for (const incomingUser of list) {
+        const idx = currentList.findIndex(u => u.id === incomingUser.id);
+        if (idx > -1) {
+          currentList[idx] = mergeSingleUser(currentList[idx], incomingUser);
+        } else {
+          currentList.push(incomingUser);
+        }
+      }
+      writeDb(currentList);
+      return res.json({ success: true, count: currentList.length });
     }
     res.status(400).json({ error: "Payload must be a UserAccount array" });
   });
