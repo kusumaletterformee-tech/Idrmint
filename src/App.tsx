@@ -119,7 +119,8 @@ export default function App() {
       }
 
       saveTimeoutRef.current = setTimeout(() => {
-        fetch('/api/users/save-all', {
+        const targetUrl = window.location.origin + '/api/users/save-all';
+        fetch(targetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -187,7 +188,8 @@ export default function App() {
 
     const pullDatabase = async () => {
       try {
-        const res = await fetch('/api/users');
+        const targetUrl = window.location.origin + '/api/users';
+        const res = await fetch(targetUrl);
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted && Array.isArray(data) && data.length > 0) {

@@ -29,6 +29,7 @@ export interface DepositTransaction {
   paymentMethod: 'QRIS';
   status: 'Pending' | 'Completed' | 'Expired';
   referenceNumber: string;
+  userConfirmed?: boolean;
 }
 
 export interface MiningLog {

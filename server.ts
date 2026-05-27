@@ -3,9 +3,95 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { UserAccount } from "./src/types";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDocs, collection } from "firebase/firestore";
 
 // In-memory representation backed by ./db.json
 const DB_PATH = path.join(process.cwd(), "db.json");
+
+// Lazy Firebase Firestore initializer & sync engine
+const FIREBASE_CONFIG_PATH = path.join(process.cwd(), "firebase-applet-config.json");
+let firestoreInstance: any = null;
+
+function getFirestoreDb() {
+  if (firestoreInstance) return firestoreInstance;
+  try {
+    if (fs.existsSync(FIREBASE_CONFIG_PATH)) {
+      const configRaw = fs.readFileSync(FIREBASE_CONFIG_PATH, "utf-8");
+      const firebaseConfig = JSON.parse(configRaw);
+      const app = initializeApp(firebaseConfig);
+      firestoreInstance = getFirestore(app);
+      console.log("[FIREBASE] Firestore initialized successfully on backend.");
+      return firestoreInstance;
+    }
+  } catch (err) {
+    console.warn("[FIREBASE] Lazy initialization skipped or failed:", err);
+  }
+  return null;
+}
+
+// Background sync users database to Cloud Firestore "/users" path
+async function syncUsersToFirebase(users: UserAccount[]) {
+  const db = getFirestoreDb();
+  if (!db) return;
+
+  try {
+    for (const user of users) {
+      const userRef = doc(db, "users", user.id);
+      await setDoc(userRef, user);
+    }
+    console.log(`[FIREBASE] Synced ${users.length} user profiles successfully to Firestore (/users)`);
+  } catch (err) {
+    console.error("[FIREBASE] Error syncing user to Firestore:", err);
+  }
+}
+
+// Pull updates from Cloud Firestore and merge into local in-memory DB cache
+async function pullUsersFromFirebase() {
+  const db = getFirestoreDb();
+  if (!db) return;
+
+  try {
+    const colRef = collection(db, "users");
+    const snapshot = await getDocs(colRef);
+    if (snapshot.empty) return;
+
+    const firebaseUsers: UserAccount[] = [];
+    snapshot.forEach(docSnap => {
+      firebaseUsers.push(docSnap.data() as UserAccount);
+    });
+
+    if (firebaseUsers.length > 0) {
+      if (fs.existsSync(DB_PATH)) {
+        const localContent = fs.readFileSync(DB_PATH, "utf-8");
+        const localUsers: UserAccount[] = JSON.parse(localContent);
+        
+        const mergedUsers = [...localUsers];
+        let changes = false;
+        
+        for (const fbUser of firebaseUsers) {
+          const idx = mergedUsers.findIndex(u => u.id === fbUser.id);
+          if (idx > -1) {
+            mergedUsers[idx] = fbUser;
+            changes = true;
+          } else {
+            mergedUsers.push(fbUser);
+            changes = true;
+          }
+        }
+        
+        if (changes) {
+          fs.writeFileSync(DB_PATH, JSON.stringify(mergedUsers, null, 2), "utf-8");
+          console.log(`[FIREBASE] Merged ${firebaseUsers.length} profiles from Firestore into local database.`);
+        }
+      } else {
+        fs.writeFileSync(DB_PATH, JSON.stringify(firebaseUsers, null, 2), "utf-8");
+      }
+    }
+  } catch (err) {
+    console.error("[FIREBASE] Error pulling profiles from Firestore:", err);
+  }
+}
 
 // Default seed users (Admin Indra and Member Joko)
 const DEFAULT_USERS: UserAccount[] = [
@@ -190,6 +276,10 @@ function readDb(): UserAccount[] {
 function writeDb(users: UserAccount[]) {
   try {
     fs.writeFileSync(DB_PATH, JSON.stringify(users, null, 2), "utf-8");
+    // Synchronize to Firestore asynchronously
+    syncUsersToFirebase(users).catch((err) => {
+      console.error("[FIREBASE] Async sync error:", err);
+    });
   } catch (err) {
     console.error("Failed to write db.json", err);
   }
@@ -204,6 +294,40 @@ async function startServer() {
 
   // Ensure DB gets initialized
   readDb();
+
+  // Lazy Firebase activation and initial sync at start
+  const dbTest = getFirestoreDb();
+  if (dbTest) {
+    pullUsersFromFirebase().then(() => {
+      // Once pulled initially, upload any missing items
+      syncUsersToFirebase(readDb()).catch(err => {
+        console.error("[FIREBASE] Startup sync failed:", err);
+      });
+    }).catch(err => {
+      console.error("[FIREBASE] Startup pull failed:", err);
+    });
+  }
+
+  // Periodic Firestore synchronization (every 15 seconds) to pull updates made on other clients/instances
+  setInterval(() => {
+    pullUsersFromFirebase().catch(err => {
+      console.error("[FIREBASE] Interval pull failed:", err);
+    });
+  }, 15000);
+
+  // API 0: Firebase real-time setup and sync status helper
+  app.get("/api/firebase-status", (req, res) => {
+    const isConfigured = fs.existsSync(FIREBASE_CONFIG_PATH);
+    const isInitialized = firestoreInstance !== null;
+    res.json({
+      connected: isInitialized,
+      configured: isConfigured,
+      collectionPath: "/users",
+      info: isConfigured 
+        ? "Firebase Firestore terhubung secara real-time dan mengamankan data pengguna."
+        : "Menunggu konfigurasi firebase-applet-config.json dibuat melalui Setup UI Firebase."
+    });
+  });
 
   // API 1: Fetch all users
   app.get("/api/users", (req, res) => {

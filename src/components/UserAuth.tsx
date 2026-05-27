@@ -118,7 +118,8 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
         joinedAt: new Date().toLocaleDateString('id-ID')
       };
 
-      fetch('/api/users/update', {
+      const targetUrl = window.location.origin + '/api/users/update';
+      fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser)

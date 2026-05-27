@@ -17,6 +17,27 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
   const [newBalance, setNewBalance] = useState<string>('');
   const [newEWallet, setNewEWallet] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
+  const [firebaseStatus, setFirebaseStatus] = useState<{
+    connected: boolean;
+    configured: boolean;
+    collectionPath: string;
+    info: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    fetch('/api/firebase-status')
+      .then(res => res.json())
+      .then(data => {
+        if (isMounted) setFirebaseStatus(data);
+      })
+      .catch(err => {
+        console.warn("Failed to fetch Firebase status in Admin Panel:", err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const startEditUser = (user: UserAccount) => {
     setEditingUser(user);
@@ -168,9 +189,30 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
   };
 
   const pendingWithdrawalsCount = allWithdrawals.filter(w => w.withdrawal.status === 'Processing').length;
+  const pendingConfirmedDepositsCount = allDeposits.filter(d => d.deposit.status === 'Pending' && d.deposit.userConfirmed).length;
 
   return (
     <div className="space-y-6">
+      {/* Pending Deposits Notification Banner */}
+      {pendingConfirmedDepositsCount > 0 && (
+        <div className="rounded-2xl border border-indigo-950 bg-indigo-950/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 bg-indigo-950/60 border border-indigo-800/50 rounded-lg flex items-center justify-center text-indigo-400 shrink-0">
+              <Check className="h-4 w-4 text-indigo-455 font-bold animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white font-sans uppercase tracking-wide">💼 Verifikasi Deposit Manual Menunggu Persetujuan ({pendingConfirmedDepositsCount})</h4>
+              <p className="text-[10.5px] text-zinc-400 mt-0.5 leading-relaxed">
+                Terdapat {pendingConfirmedDepositsCount} deposit QRIS yang telah dikonfirmasi manual (PAID/KONFIRMASI) oleh pengguna. Silakan periksa mutasi rekening/e-wallet Anda dan setujui transaksi di bawah.
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-500 text-zinc-950">
+            TRANSFER VERIFICATION
+          </span>
+        </div>
+      )}
+
       {/* Pending Withdrawals Notification Banner */}
       {pendingWithdrawalsCount > 0 && (
         <div className="rounded-2xl border border-amber-950 bg-amber-950/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse">
@@ -209,6 +251,36 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
         <span className="shrink-0 px-2.5 py-1 text-xs font-mono rounded bg-rose-950 text-rose-400 border border-rose-900/40 font-bold">
           ADMIN AKKREDITED
         </span>
+      </div>
+
+      {/* Firebase Cloud Sync Connection Status Badge Card */}
+      <div className="rounded-2xl border border-zinc-900 bg-zinc-950/60 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex gap-3">
+          <div className="p-2.5 rounded-xl bg-indigo-950/60 border border-indigo-900/40 text-indigo-400 shrink-0">
+            <RefreshCw className={`h-6 w-6 ${firebaseStatus?.connected ? 'animate-spin-slow text-emerald-400' : 'text-indigo-400'}`} />
+          </div>
+          <div>
+            <h3 className="font-sans font-semibold text-white flex items-center gap-2">
+              Sistem Database Cloud Firestore
+              {firebaseStatus?.connected ? (
+                <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-900/40 px-2 py-0.5 rounded-full font-bold">
+                  ACTIVE SYNC
+                </span>
+              ) : (
+                <span className="text-[9px] font-mono bg-zinc-900 text-zinc-400 border border-zinc-850 px-2 py-0.5 rounded-full">
+                  OFFLINE CACHE ACTIVE
+                </span>
+              )}
+            </h3>
+            <p className="text-zinc-400 text-xs mt-0.8 leading-relaxed max-w-xl">
+              {firebaseStatus ? firebaseStatus.info : "Memuat informasi status server database..."}
+            </p>
+          </div>
+        </div>
+        <div className="text-left md:text-right font-mono text-[10.5px]">
+          <div className="text-zinc-500">Path: <strong className="text-zinc-400">{firebaseStatus?.collectionPath || "/users"}</strong></div>
+          <div className="mt-0.5 text-zinc-500">Provider: <strong className="text-zinc-400">Google Cloud Platform</strong></div>
+        </div>
       </div>
 
       {successMsg && (
@@ -385,8 +457,13 @@ export default function AdminPanel({ users, setUsers, currentUser, onAddLog, onS
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <div className="text-[11px] font-bold text-white uppercase tracking-wider">
+                        <div className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-2 flex-wrap">
                           Invoice: <span className="text-indigo-400">{deposit.id}</span>
+                          {deposit.status === 'Pending' && deposit.userConfirmed && (
+                            <span className="text-[8.5px] bg-amber-500 text-zinc-950 px-1.5 py-0.2 rounded font-black tracking-wide animate-pulse uppercase">
+                              ⚠️ Confirmed By User
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-zinc-500 font-mono">
                           User: <strong className="text-zinc-305">{user.username}</strong> ({user.email})
