@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cpu, Wallet, Users, KeyRound, Terminal, RotateCcw, Landmark, Clock, QrCode, LogOut, Shield, Zap, FileText, CheckSquare } from 'lucide-react';
-import { MiningConfig, UserAccount } from './types';
+import { MiningConfig, UserAccount, DEFAULT_CLIENT_USERS } from './types';
 import { generateKeyPair, generateRandomCode, formatRupiah } from './utils';
 import MiningDashboard from './components/MiningDashboard';
 import WalletTransit from './components/WalletTransit';
@@ -19,7 +19,7 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState<string>('');
 
   // Local Simulated Users Database State
-  const [users, _setUsers] = useState<UserAccount[]>([]);
+  const [users, _setUsers] = useState<UserAccount[]>(DEFAULT_CLIENT_USERS);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

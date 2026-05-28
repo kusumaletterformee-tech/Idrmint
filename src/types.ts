@@ -117,3 +117,120 @@ export const MINING_RIGS: MiningRigItem[] = [
   }
 ];
 
+export const DEFAULT_CLIENT_USERS: UserAccount[] = [
+  {
+    id: "UID-KUSUMAX",
+    username: "Kusumax",
+    email: "kusumax@idrminer.com",
+    passwordHex: "admin123",
+    isAdmin: true,
+    joinedAt: "27/5/2026",
+    miningConfig: {
+      balancePenampungan: 125000,
+      balanceEWallet: 500000,
+      totalMined: 625000,
+      baseHashRate: 20.0,
+      boostMultiplier: 1.0,
+      isMiningActive: true,
+      referralCode: "IDR-KUSUMAX",
+      referredBy: null,
+      referrals: [],
+      autoWithdrawActive: false,
+      targetEWallet: "DANA",
+      walletNumber: "081234567890",
+      payoutThreshold: 50000,
+      payoutProgress: 45,
+      payoutHistory: [],
+      depositHistory: [],
+      privateKey: "",
+      publicKey: "",
+      machineActiveDays: 3,
+      rentedRigs: []
+    }
+  },
+  {
+    id: "UID-10001",
+    username: "admin",
+    email: "admin@idrminer.com",
+    passwordHex: "admin123",
+    isAdmin: true,
+    joinedAt: "25/5/2026",
+    miningConfig: {
+      balancePenampungan: 1421034,
+      balanceEWallet: 1000000,
+      totalMined: 1421034,
+      baseHashRate: 15.0,
+      boostMultiplier: 1.0,
+      isMiningActive: true,
+      referralCode: "IDR-ADMN",
+      referredBy: null,
+      referrals: [],
+      autoWithdrawActive: false,
+      targetEWallet: "DANA",
+      walletNumber: "081211112222",
+      payoutThreshold: 10000,
+      payoutProgress: 0,
+      payoutHistory: [],
+      depositHistory: [],
+      privateKey: "",
+      publicKey: "",
+      machineActiveDays: 3,
+      rentedRigs: []
+    }
+  },
+  {
+    id: "UID-10002",
+    username: "jokowow",
+    email: "joko@gmail.com",
+    passwordHex: "user123",
+    isAdmin: false,
+    joinedAt: "25/5/2026",
+    miningConfig: {
+      balancePenampungan: 18450,
+      balanceEWallet: 54000,
+      totalMined: 72450,
+      baseHashRate: 4.8,
+      boostMultiplier: 1.0,
+      isMiningActive: true,
+      referralCode: "IDR-F7X8",
+      referredBy: null,
+      referrals: [],
+      autoWithdrawActive: true,
+      targetEWallet: "DANA",
+      walletNumber: "081298765432",
+      payoutThreshold: 50000,
+      payoutProgress: 36,
+      payoutHistory: [
+        {
+          id: "TXN-842911",
+          userId: "UID-10002",
+          username: "jokowow",
+          timestamp: "25/5/2026, 14:12:00",
+          amount: 35000,
+          walletType: "DANA",
+          walletNumber: "081298765432",
+          txHash: "0x3a8b417fcd9e02c59de104a8b7ddf2bb89a19c636f014e3da8f7c9e0cba002ae",
+          status: "Completed"
+        }
+      ],
+      depositHistory: [
+        {
+          id: "QRS-41829",
+          userId: "UID-10002",
+          username: "jokowow",
+          timestamp: "25/5/2026, 11:05:00",
+          amount: 25000,
+          paymentMethod: "QRIS",
+          status: "Completed",
+          referenceNumber: "REF-XZ901248KLPB"
+        }
+      ],
+      privateKey: "",
+      publicKey: "",
+      machineActiveDays: 3,
+      rentedRigs: []
+    }
+  }
+];
+
+
