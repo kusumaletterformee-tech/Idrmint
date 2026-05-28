@@ -29,7 +29,7 @@ export default function App() {
       const nextUsers = typeof value === 'function' ? (value as any)(prev) : value;
 
       // Identify modified or new users, and update them specifically in the database
-      const targetUrl = window.location.origin + '/api/users/update';
+      const targetUrl = '/api/users/update';
       nextUsers.forEach((user: UserAccount) => {
         const prevUser = prev.find(u => u.id === user.id);
         if (!prevUser || JSON.stringify(prevUser) !== JSON.stringify(user)) {
@@ -106,7 +106,7 @@ export default function App() {
       };
 
       // Propagation via our update API directly on save
-      const targetUrl = window.location.origin + '/api/users/update';
+      const targetUrl = '/api/users/update';
       fetch(targetUrl, {
         method: 'POST',
         headers: {
@@ -142,7 +142,7 @@ export default function App() {
 
     const pullDatabase = async () => {
       try {
-        const targetUrl = window.location.origin + '/api/users';
+        const targetUrl = '/api/users';
         const res = await fetch(targetUrl);
         if (!res.ok) return;
         const data = await res.json();

@@ -81,7 +81,7 @@ export default function QrisDeposit({ config, setConfig, onAddLog, userId }: Qri
 
     setIsGenerating(true);
     
-    const targetUrl = window.location.origin + '/api/deposit/create';
+    const targetUrl = '/api/deposit/create';
 
     // Server-side creation of a real pending transaction
     fetch(targetUrl, {

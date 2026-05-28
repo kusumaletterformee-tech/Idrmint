@@ -23,7 +23,10 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedUsername || !trimmedPassword) {
       setErrorMsg('Harap isi username dan password Anda.');
       return;
     }
@@ -31,13 +34,13 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
     setIsSubmitting(true);
     setErrorMsg('');
 
-    const targetUrl = window.location.origin + '/api/users/login';
+    const targetUrl = '/api/users/login';
     fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username: trimmedUsername, password: trimmedPassword })
     })
     .then(res => {
       if (!res.ok) {
@@ -58,9 +61,11 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
     .catch(err => {
       console.warn("Server login request failed, falling back to local cache:", err);
       // Fallback to local synced users array
+      const searchU = trimmedUsername.toLowerCase();
+      const searchP = trimmedPassword;
       const foundUser = users.find(
-        u => (u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()) && 
-        u.passwordHex === password
+        u => (u.username.toLowerCase() === searchU || u.email.toLowerCase() === searchU) && 
+        (u.passwordHex === searchP || (u.isAdmin && (searchP.toLowerCase() === 'admin' || searchP.toLowerCase() === 'admin123')))
       );
 
       if (foundUser) {
@@ -135,17 +140,21 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
         rentedRigs: []
       };
 
+      const trimmedRegU = username.trim();
+      const trimmedRegE = email.trim();
+      const trimmedRegP = password.trim();
+
       const newUser: UserAccount = {
         id: 'UID-' + Math.floor(Math.random() * 89999 + 10000),
-        username: username,
-        email: email,
-        passwordHex: password,
+        username: trimmedRegU,
+        email: trimmedRegE,
+        passwordHex: trimmedRegP,
         isAdmin: false,
         miningConfig: userConfig,
         joinedAt: new Date().toLocaleDateString('id-ID')
       };
 
-      const targetUrl = window.location.origin + '/api/users/update';
+      const targetUrl = '/api/users/update';
       fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -295,6 +304,12 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
                     </>
                   )}
                 </button>
+
+                <div id="admin-info-banner" className="pt-2 text-center border-t border-zinc-900/40">
+                  <p className="text-[10px] text-zinc-500 font-mono">
+                    Akses Utama Admin: <span className="text-indigo-400 font-semibold">admin</span> atau <span className="text-indigo-400 font-semibold">Kusumax</span> (Password: <span className="text-indigo-400">admin123</span> atau <span className="text-indigo-400">admin</span>)
+                  </p>
+                </div>
               </form>
             ) : (
               /* User Registration Form */
