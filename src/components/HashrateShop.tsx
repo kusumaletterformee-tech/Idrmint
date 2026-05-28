@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, ShieldCheck, ArrowRight, ShoppingBag, BatteryCharging, AlertCircle, ShoppingCart, Cpu, Hourglass } from 'lucide-react';
-import { MiningConfig } from '../types';
+import { MiningConfig, MiningRigItem, MINING_RIGS } from '../types';
 import { formatRupiah } from '../utils';
 
 interface HashrateShopProps {
@@ -9,50 +9,12 @@ interface HashrateShopProps {
   onAddLog: (log: string) => void;
 }
 
-interface MiningRigItem {
-  id: string;
-  name: string;
-  hashPower: number; // in KH/s
-  price: number; // in Rupiah (from balanceEWallet)
-  efficiency: string;
-  description: string;
-  durabilityDays: number;
-}
-
 export default function HashrateShop({ config, setConfig, onAddLog }: HashrateShopProps) {
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   
   // Simulated List of Rig Hardware to Lease
-  const [rigsList, setRigsList] = useState<MiningRigItem[]>([
-    {
-      id: 'rig-bronze',
-      name: 'Antminer S9 - IDR Lite edition',
-      hashPower: 15.0,
-      price: 15000,
-      efficiency: '88%',
-      description: 'Mesin entry-level hemat daya dengan booster akselerasi Cloud. Pemecahan block hash stabil konstan.',
-      durabilityDays: 30
-    },
-    {
-      id: 'rig-silver',
-      name: 'WhatsMiner M30S - IDR Medium',
-      hashPower: 45.0,
-      price: 45000,
-      efficiency: '94%',
-      description: 'Hashrate super stabil tinggi dioptimalkan secara dinamis untuk kolam penambangan regional Asia-Tenggara.',
-      durabilityDays: 60
-    },
-    {
-      id: 'rig-gold',
-      name: 'AvalonMade 1246 - IDR Extreme Pro',
-      hashPower: 150.0,
-      price: 100000,
-      efficiency: '99%',
-      description: 'Sewa rig tingkat industri gaban bertenaga tinggi dengan sistem asimetris terenkripsi 256-bit penuh.',
-      durabilityDays: 90
-    }
-  ]);
+  const rigsList = MINING_RIGS;
 
   const machineActiveDays = config.machineActiveDays ?? 3;
 

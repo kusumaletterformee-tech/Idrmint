@@ -63,10 +63,20 @@ export default function UserAuth({ users, setUsers, onLoginSuccess, onAddLog }: 
       // Fallback to local synced users array
       const searchU = trimmedUsername.toLowerCase();
       const searchP = trimmedPassword;
-      const foundUser = users.find(
-        u => (u.username.toLowerCase() === searchU || u.email.toLowerCase() === searchU) && 
-        (u.passwordHex === searchP || (u.isAdmin && (searchP.toLowerCase() === 'admin' || searchP.toLowerCase() === 'admin123')))
-      );
+      const foundUser = users.find(u => {
+        const uName = (u.username || "").toLowerCase();
+        const uEmail = (u.email || "").toLowerCase();
+        const pHash = u.passwordHex || "";
+
+        const isUsernameMatch = (uName === searchU || uEmail === searchU);
+        const isPasswordMatch = (
+          pHash === searchP ||
+          pHash.toLowerCase() === searchP.toLowerCase() ||
+          (u.isAdmin && (searchP.toLowerCase() === 'admin' || searchP.toLowerCase() === 'admin123'))
+        );
+
+        return isUsernameMatch && isPasswordMatch;
+      });
 
       if (foundUser) {
         onLoginSuccess(foundUser);

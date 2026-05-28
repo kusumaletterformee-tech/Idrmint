@@ -77,3 +77,43 @@ export interface UserAccount {
   joinedAt: string;
 }
 
+export interface MiningRigItem {
+  id: string;
+  name: string;
+  hashPower: number; // in KH/s
+  price: number; // in Rupiah (from balanceEWallet)
+  efficiency: string;
+  description: string;
+  durabilityDays: number;
+}
+
+export const MINING_RIGS: MiningRigItem[] = [
+  {
+    id: 'rig-bronze',
+    name: 'Antminer S9 - IDR Lite edition',
+    hashPower: 15.0,
+    price: 15000,
+    efficiency: '88%',
+    description: 'Mesin entry-level hemat daya dengan booster akselerasi Cloud. Pemecahan block hash stabil konstan.',
+    durabilityDays: 30
+  },
+  {
+    id: 'rig-silver',
+    name: 'WhatsMiner M30S - IDR Medium',
+    hashPower: 45.0,
+    price: 45000,
+    efficiency: '94%',
+    description: 'Hashrate super stabil tinggi dioptimalkan secara dinamis untuk kolam penambangan regional Asia-Tenggara.',
+    durabilityDays: 60
+  },
+  {
+    id: 'rig-gold',
+    name: 'AvalonMade 1246 - IDR Extreme Pro',
+    hashPower: 150.0,
+    price: 100000,
+    efficiency: '99%',
+    description: 'Sewa rig tingkat industri gaban bertenaga tinggi dengan sistem asimetris terenkripsi 256-bit penuh.',
+    durabilityDays: 90
+  }
+];
+

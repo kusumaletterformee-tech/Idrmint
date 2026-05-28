@@ -7,10 +7,10 @@
     "isAdmin": true,
     "joinedAt": "25/5/2026",
     "miningConfig": {
-      "balancePenampungan": 3202,
-      "balanceEWallet": 20000,
-      "totalMined": 3202,
-      "baseHashRate": 15,
+      "balancePenampungan": 1315311,
+      "balanceEWallet": 60000,
+      "totalMined": 1315311,
+      "baseHashRate": 510,
       "boostMultiplier": 1,
       "isMiningActive": true,
       "referralCode": "IDR-ADMN",
@@ -24,13 +24,24 @@
       "payoutHistory": [],
       "depositHistory": [
         {
+          "id": "QRS-46940",
+          "userId": "UID-10001",
+          "username": "admin",
+          "timestamp": "18.08.53",
+          "amount": 20000,
+          "paymentMethod": "QRIS",
+          "status": "Completed",
+          "referenceNumber": "REF-Y9C5GB4PZ7PG",
+          "userConfirmed": true
+        },
+        {
           "id": "QRS-90019",
           "userId": "UID-10001",
           "username": "admin",
           "timestamp": "20.28.37",
           "amount": 20000,
           "paymentMethod": "QRIS",
-          "status": "Pending",
+          "status": "Completed",
           "referenceNumber": "REF-D3D9R50FCXGT"
         },
         {
@@ -46,10 +57,12 @@
       ],
       "privateKey": "prv_580bb7eac62c84aba4f4f5b493286b3d",
       "publicKey": "pub_316a1c4f34c980ed23c90980db669d05",
-      "machineActiveDays": 3,
-      "rentedRigs": [],
-      "miningSessionExpiry": 1779913850091,
-      "lastMinedAt": 1779827618339
+      "machineActiveDays": 663,
+      "rentedRigs": [
+        "rig-silver"
+      ],
+      "miningSessionExpiry": 1780077701691,
+      "lastMinedAt": 1779992467469
     }
   },
   {
@@ -104,5 +117,65 @@
       "machineActiveDays": 3,
       "rentedRigs": []
     }
+  },
+  {
+    "id": "UID-KUSUMAX",
+    "username": "Kusumax",
+    "email": "kusumax@idrminer.com",
+    "passwordHex": "admin123",
+    "isAdmin": true,
+    "joinedAt": "27/5/2026",
+    "miningConfig": {
+      "balancePenampungan": 125000,
+      "balanceEWallet": 500000,
+      "totalMined": 625000,
+      "baseHashRate": 20,
+      "boostMultiplier": 1,
+      "isMiningActive": true,
+      "referralCode": "IDR-KUSUMAX",
+      "referredBy": null,
+      "referrals": [],
+      "autoWithdrawActive": false,
+      "targetEWallet": "DANA",
+      "walletNumber": "081234567890",
+      "payoutThreshold": 50000,
+      "payoutProgress": 45,
+      "payoutHistory": [],
+      "depositHistory": [],
+      "privateKey": "",
+      "publicKey": "",
+      "machineActiveDays": 3,
+      "rentedRigs": []
+    }
+  },
+  {
+    "id": "UID-26716",
+    "username": "Karunaon",
+    "email": "karunaon@gmail.cok",
+    "passwordHex": "ikos009",
+    "isAdmin": false,
+    "miningConfig": {
+      "balancePenampungan": 15,
+      "balanceEWallet": 0,
+      "totalMined": 15,
+      "baseHashRate": 4.5,
+      "boostMultiplier": 1,
+      "isMiningActive": true,
+      "referralCode": "IDR-Q7XN",
+      "referredBy": null,
+      "referrals": [],
+      "autoWithdrawActive": false,
+      "targetEWallet": "DANA",
+      "walletNumber": "8316904604694",
+      "payoutThreshold": 10000,
+      "payoutProgress": 0,
+      "payoutHistory": [],
+      "depositHistory": [],
+      "privateKey": "prv_f5ccd678d7d87dec002475818ffef0bb",
+      "publicKey": "pub_80e47294bd8d8ac144825d98223dd4db",
+      "machineActiveDays": 3,
+      "rentedRigs": []
+    },
+    "joinedAt": "29/5/2026"
   }
 ]

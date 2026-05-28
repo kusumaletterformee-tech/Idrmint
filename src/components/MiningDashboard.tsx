@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cpu, Zap, Activity, Play, Pause, AlertTriangle, ArrowUpRight, ShieldCheck, Database } from 'lucide-react';
-import { MiningConfig, MiningLog } from '../types';
+import { MiningConfig, MiningLog, MINING_RIGS } from '../types';
 import { formatRupiah, generateCryptoHash } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -295,31 +295,33 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
       {/* Real-time Mining Board & Hashing Visualizer */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Core Algorithm Status */}
-        <div className="lg:col-span-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-lg">
-          <h3 className="font-sans font-medium text-white flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-400" />
-            Security Shield Engine
-          </h3>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Algoritma pertambangan IDR menggunakan standar enkripsi <strong>AES-256</strong> dipasangkan dengan 24-hour verification block hashes untuk mendeteksi transaksi parasit.
-          </p>
+        <div className="lg:col-span-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-lg flex flex-col justify-between">
+          <div>
+            <h3 className="font-sans font-medium text-white flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-400" />
+              Security Shield Engine
+            </h3>
+            <p className="text-xs text-zinc-400 leading-relaxed mt-3">
+              Algoritma pertambangan IDR menggunakan standar enkripsi <strong>AES-256</strong> dipasangkan dengan 24-hour verification block hashes untuk mendeteksi transaksi parasit.
+            </p>
 
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono">
-              <span className="text-zinc-500">Protokol:</span>
-              <span className="text-white">IDR-AES-SHA2</span>
-            </div>
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono">
-              <span className="text-zinc-500">Pool Node:</span>
-              <span className="text-emerald-400">Jakarta-Core-1</span>
-            </div>
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono">
-              <span className="text-zinc-500">Mined Lifetime:</span>
-              <span className="text-white">{formatRupiah(config.totalMined)}</span>
+            <div className="space-y-3 pt-4">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono">
+                <span className="text-zinc-500">Protokol:</span>
+                <span className="text-white">IDR-AES-SHA2</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-zinc-805 text-xs font-mono">
+                <span className="text-zinc-500">Pool Node:</span>
+                <span className="text-emerald-400">Jakarta-Core-1</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-zinc-805 text-xs font-mono">
+                <span className="text-zinc-500">Mined Lifetime:</span>
+                <span className="text-white">{formatRupiah(config.totalMined)}</span>
+              </div>
             </div>
           </div>
 
-          <div className="p-3 bg-zinc-900/70 border border-zinc-800 rounded-xl text-xs space-y-1 text-zinc-400">
+          <div className="p-3 bg-zinc-900/70 border border-zinc-800 rounded-xl text-[11px] space-y-1 text-zinc-400 mt-4">
             <div className="flex items-center gap-1.5 text-zinc-300 font-medium mb-1">
               <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
               Informasi Mining 24 Jam
@@ -328,8 +330,77 @@ export default function MiningDashboard({ config, setConfig, onAddLog }: MiningD
           </div>
         </div>
 
+        {/* Active Machine Life & Telemetry */}
+        <div className="lg:col-span-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 space-y-4 shadow-lg flex flex-col justify-between">
+          <div>
+            <h3 className="font-sans font-medium text-white flex items-center gap-2 border-b border-zinc-900 pb-2">
+              <Cpu className="h-5 w-5 text-emerald-405" />
+              Active Machine Life & Telemetry
+            </h3>
+
+            <p className="text-xs text-zinc-400 leading-relaxed mt-3">
+              Monitor real-time waktu aktif mesin penambangan virtual Anda di bawah. Setiap sewa rig baru memperpanjang masa aktif pertambangan server Anda.
+            </p>
+
+            <div className="space-y-3 pt-4">
+              <div className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-850 space-y-1">
+                <span className="text-[10px] text-zinc-500 font-mono uppercase block">Status Mesin</span>
+                <div className="flex items-center gap-1.5 text-xs text-white font-bold font-sans">
+                  <span className={`h-2 w-2 rounded-full ${config.isMiningActive ? 'bg-emerald-400 animate-ping' : 'bg-red-500'}`} />
+                  <span>{config.isMiningActive ? 'Bekerja Stabil (24 Jam Mined)' : 'Menunggu Daya Aktif'}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-850 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-zinc-500 font-mono uppercase">Kontrak Day Aktif</span>
+                  <span className="text-xs text-white font-mono font-bold">{(config.machineActiveDays ?? 3)} Hari Sisa</span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-900">
+                  <div 
+                    className="h-full bg-gradient-to-r from-pink-500 to-indigo-500" 
+                    style={{ width: `${Math.min(100, Math.max(10, ((config.machineActiveDays ?? 3) / 120) * 100))}%` }} 
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-850 space-y-2 text-[10px] text-zinc-400 font-mono">
+                <div className="flex justify-between">
+                  <span>Total Speed Sesi:</span>
+                  <span className="text-white font-bold">{(config.baseHashRate * config.boostMultiplier).toFixed(2)} KH/s</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Algoritma Rig:</span>
+                  <span className="text-white">SHA256-IDR-Secure</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Daya Konsumsi (Sewa):</span>
+                  <span className="text-emerald-400 font-bold">{(config.rentedRigs && config.rentedRigs.length > 0) ? `${(0.05 + config.rentedRigs.length * 0.12).toFixed(2)} kW/h` : '0.05 kW/h (Eco)'}</span>
+                </div>
+              </div>
+
+              {config.rentedRigs && config.rentedRigs.length > 0 && (
+                <div className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-850 space-y-1.5 max-h-[120px] overflow-y-auto">
+                  <span className="text-[10px] text-zinc-500 font-mono uppercase font-bold block">📦 RIG AKTIF DI SERVER (DATABASE)</span>
+                  <div className="space-y-1">
+                    {config.rentedRigs.map((rigId, idx) => {
+                      const matchedRig = MINING_RIGS.find(r => r.id === rigId);
+                      return (
+                        <div key={idx} className="flex justify-between text-[10px] font-mono p-1 bg-zinc-950/40 rounded border border-zinc-850/40">
+                          <span className="text-zinc-300 truncate max-w-[110px]">{matchedRig?.name || 'Sewa Tambahan'}</span>
+                          <span className="text-pink-400 font-bold">+{matchedRig?.hashPower.toFixed(1) || '15.0'} KH/s</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Live Block Rewards (The transit ledger) */}
-        <div className="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 flex flex-col justify-between shadow-lg">
+        <div className="lg:col-span-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 flex flex-col justify-between shadow-lg">
           <div>
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-zinc-800">
               <h3 className="font-sans font-medium text-white flex items-center gap-2">

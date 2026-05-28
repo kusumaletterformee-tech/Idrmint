@@ -350,20 +350,6 @@ function mergeHistories(existing: any[] | undefined, incoming: any[] | undefined
   return list;
 }
 
-function mergeRigs(existing: any[] | undefined, incoming: any[] | undefined): any[] {
-  const list = [...(existing || [])];
-  const incomingItems = incoming || [];
-  for (const inc of incomingItems) {
-    const idx = list.findIndex(item => item.id === inc.id);
-    if (idx > -1) {
-      list[idx] = { ...list[idx], ...inc };
-    } else {
-      list.push(inc);
-    }
-  }
-  return list;
-}
-
 function mergeSingleUser(existing: UserAccount, incoming: UserAccount): UserAccount {
   const existingConfig = (existing.miningConfig || {}) as any;
   const incomingConfig = (incoming.miningConfig || {}) as any;
@@ -371,13 +357,13 @@ function mergeSingleUser(existing: UserAccount, incoming: UserAccount): UserAcco
   const mergedConfig = {
     ...existingConfig,
     ...incomingConfig,
-    balancePenampungan: Math.max(existingConfig.balancePenampungan || 0, incomingConfig.balancePenampungan || 0),
-    balanceEWallet: Math.max(existingConfig.balanceEWallet || 0, incomingConfig.balanceEWallet || 0),
-    totalMined: Math.max(existingConfig.totalMined || 0, incomingConfig.totalMined || 0),
-    payoutProgress: Math.max(existingConfig.payoutProgress || 0, incomingConfig.payoutProgress || 0),
+    balancePenampungan: incomingConfig.balancePenampungan !== undefined ? incomingConfig.balancePenampungan : (existingConfig.balancePenampungan || 0),
+    balanceEWallet: incomingConfig.balanceEWallet !== undefined ? incomingConfig.balanceEWallet : (existingConfig.balanceEWallet || 0),
+    totalMined: incomingConfig.totalMined !== undefined ? incomingConfig.totalMined : (existingConfig.totalMined || 0),
+    payoutProgress: incomingConfig.payoutProgress !== undefined ? incomingConfig.payoutProgress : (existingConfig.payoutProgress || 0),
     depositHistory: mergeHistories(existingConfig.depositHistory, incomingConfig.depositHistory),
     payoutHistory: mergeHistories(existingConfig.payoutHistory, incomingConfig.payoutHistory),
-    rentedRigs: mergeRigs(existingConfig.rentedRigs, incomingConfig.rentedRigs)
+    rentedRigs: incomingConfig.rentedRigs !== undefined ? incomingConfig.rentedRigs : (existingConfig.rentedRigs || [])
   };
 
   return {
@@ -441,21 +427,36 @@ async function startServer() {
   app.post("/api/users/login", (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
+      console.warn("[AUTH] Login attempt blocked: username or password missing from request body");
       return res.status(400).json({ error: "Username dan password diperlukan" });
     }
 
     const cleanUsername = String(username).trim().toLowerCase();
     const cleanPassword = String(password).trim();
 
+    console.log(`[AUTH] Login attempt for: "${cleanUsername}" with password length: ${cleanPassword.length}`);
+
     const list = readDb();
-    const foundUser = list.find(
-      u => (u.username.toLowerCase() === cleanUsername || u.email.toLowerCase() === cleanUsername) && 
-      (u.passwordHex === cleanPassword || (u.isAdmin && (cleanPassword.toLowerCase() === "admin" || cleanPassword.toLowerCase() === "admin123")))
-    );
+    const foundUser = list.find(u => {
+      const uName = (u.username || "").toLowerCase();
+      const uEmail = (u.email || "").toLowerCase();
+      const pHash = u.passwordHex || "";
+      
+      const isUsernameMatch = (uName === cleanUsername || uEmail === cleanUsername);
+      const isPasswordMatch = (
+        pHash === cleanPassword || 
+        pHash.toLowerCase() === cleanPassword.toLowerCase() ||
+        (u.isAdmin && (cleanPassword.toLowerCase() === "admin" || cleanPassword.toLowerCase() === "admin123"))
+      );
+
+      return isUsernameMatch && isPasswordMatch;
+    });
 
     if (foundUser) {
+      console.log(`[AUTH] Successful login for user: ${foundUser.username} (Admin: ${foundUser.isAdmin || false})`);
       res.json({ success: true, user: foundUser });
     } else {
+      console.warn(`[AUTH] Failed login attempt for user: "${cleanUsername}"`);
       res.status(401).json({ error: "Username atau password salah." });
     }
   });
